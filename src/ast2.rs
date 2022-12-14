@@ -1,55 +1,117 @@
-// pub trait AST {
-//     fn equals(&self, other: &dyn AST) -> bool;
-// }
-//
-//
-// pub struct Node {
-//     value: f64
-// }
-//
-// impl AST for Node {
-//     fn equals(&self, other: &dyn AST) -> bool {
-//         o
-//     }
-// }
-//
-// pub struct Id {
-//     value: f64
-// }
-//
-// pub struct Not<'a> {
-//     term: &'a dyn AST
-// }
-pub enum AST {
-    Token(String),
-    Number(u64),
-    Id(String),
-    Not(Box<AST>),
-    Equal { left: Box<AST>, right: Box<AST> },
-    NotEqual { left: Box<AST>, right: Box<AST> },
-    Add { left: Box<AST>, right: Box<AST> },
-    Subtract { left: Box<AST>, right: Box<AST> },
-    Multiply { left: Box<AST>, right: Box<AST> },
-    Divide { left: Box<AST>, right: Box<AST> },
+use std::cmp;
 
-    Call {callee: String, args: Vec<Box<AST>>},
-    Return {term: Box<AST>},
-    Block {statements: Vec<Box<AST>>},
+pub trait ASTStruct {
 
-    IfNode{conditional: Box<AST>, consequence: Box<AST>, alternative: Box<AST>},
-    Function{name: String, parameters:Vec<String>, body: Box<AST>},
-    Var{name: String,  value: Box<AST>},
-    Assign{name: String,  value: Box<AST>},
-    Wile{conditional: Box<AST>,  body: Box<AST>},
 }
 
+#[derive(PartialEq, PartialOrd)]
+pub struct Number {
+    value: f64,
+}
 
-#[cfg(test)]
-mod tests {
-    use crate::ast::AST;
-
-    #[test]
-    fn it_works() {
-        AST::Equal { left: Box::new(AST::Id("x".to_string())), right: Box::new(AST::Id("y".to_string())) };
+impl Number {
+    pub fn new(value: f64)-> Self {
+        Number {value}
     }
 }
+
+
+
+#[derive(PartialEq, PartialOrd)]
+pub struct Id {
+    value: f64,
+}
+
+pub struct Not {
+    term: Box<dyn ASTStruct>,
+}
+
+//
+// pub struct Equal {
+//     left: Box<dyn AST>,
+//     right: Box<dyn AST>,
+// }
+//
+// pub struct NotEqual {
+//     left: Box<dyn AST>,
+//     right: Box<dyn AST>,
+// }
+//
+// pub struct Add {
+//     left: Box<dyn AST>,
+//     right: Box<dyn AST>,
+// }
+//
+// pub struct Subtract {
+//     left: Box<dyn AST>,
+//     right: Box<dyn AST>,
+// }
+//
+// pub struct Multiply {
+//     left: Box<dyn AST>,
+//     right: Box<dyn AST>,
+// }
+//
+// pub struct Divide {
+//     left: Box<dyn AST>,
+//     right: Box<dyn AST>,
+// }
+//
+// pub struct Call {
+//     callee: String,
+//     args: Vec<Box<dyn AST>>,
+// }
+//
+// pub struct Return {
+//     term: Box<dyn AST>,
+// }
+//
+// pub struct Block {
+//     statements: Vec<Box<dyn AST>>,
+// }
+//
+// pub struct IfNode {
+//     conditional: Box<dyn AST>,
+//     consequence: Box<dyn AST>,
+//     alternative: Box<dyn AST>,
+// }
+//
+// pub struct Function {
+//     name: String,
+//     parameters: Vec<String>,
+//     body: Box<dyn AST>,
+// }
+//
+// pub struct Var {
+//     name: String,
+//     value: Box<dyn AST>,
+// }
+//
+// pub struct Assign {
+//     name: String,
+//     value: Box<dyn AST>,
+// }
+//
+// pub struct While {
+//     conditional: Box<dyn AST>,
+//     body: Box<dyn AST>,
+// }
+
+impl ASTStruct for Number {}
+impl ASTStruct for Not {}
+// impl AST for Equal {}
+// impl AST for NotEqual {}
+// impl AST for Add {}
+// impl AST for Subtract {}
+// impl AST for Multiply {}
+// impl AST for Divide {}
+// impl AST for Call {}
+// impl AST for Return {}
+// impl AST for Block {}
+// impl AST for IfNode {}
+// impl AST for Function {}
+// impl AST for Var {}
+// impl AST for Assign {}
+// impl AST for While {}
+
+
