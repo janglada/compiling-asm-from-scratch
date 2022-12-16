@@ -79,6 +79,7 @@ mod tests {
 
     #[test]
     fn it_works() {
+
         AST::Equal { left: Box::new(AST::Id("x".to_string())), right: Box::new(AST::Id("y".to_string())) };
     }
 
