@@ -46,7 +46,7 @@ peg::parser! {
         / product()
 
     rule product() -> AST
-        = l:atom() _ op:$("*" / "/") _ r:atom() {
+        = l:comparison() _ op:$("*" / "/") _ r:comparison() {
             let ast = match op {
                 "*" =>  AST::Multiply{left:Box::new(l), right:Box::new(r)},
                 "/" =>  AST::Divide{left:Box::new(l), right:Box::new(r)},
@@ -69,13 +69,14 @@ peg::parser! {
 
             } / atom()
 
+    pub rule atom() -> AST
+      = call() / Id() / Number() / "("  e:sum() ")" { e }
 
 
       pub rule expression() -> AST
-            = comparison()
+            = sum()
 
-    pub rule atom() -> AST
-      = call() / Id() / Number() / "("  e:expression() ")" { e }
+
 
     ///
     /// keywords
@@ -144,22 +145,59 @@ mod tests {
   }
 
     #[test]
-    fn arithmetic() {
+    fn arithmetic1() {
         let expected_ast =  AST::Add{
-            left:Box::new(AST::Number(1)), right: Box::new(AST::Number(1))
+            left: Box::new(AST::Number(1)),
+            right: Box::new(AST::Multiply {
+                left: Box::new(AST::Number(3)),
+                right: Box::new(AST::Number(2)),
+            })
         };
-        let run =  lang_parser::expression("1+1");
+        println!("{}",expected_ast);
 
-        println!("{:?}", run);
-        if let Ok(expected_ast) = lang_parser::expression("1+1") {
+        if let Ok(expected_ast) = lang_parser::expression("1+3*2") {
           //  assert_eq!("varname", n)
         } else {
             panic!()
         }
-
-
-
     }
 
+    #[test]
+    fn arithmetic2() {
+        let expected_ast =  AST::Multiply{
+            left: Box::new(AST::Add {
+                left: Box::new(AST::Number(1)),
+                right: Box::new(AST::Number(3)),
+            }),
+            right: Box::new(AST::Number(2))
+        };
+        println!("{}",expected_ast);
 
+        if let Ok(expected_ast) = lang_parser::expression("(1+3) * 2") {
+            //  assert_eq!("varname", n)
+        } else {
+            panic!()
+        }
+    }
+
+    #[test]
+    fn call() {
+        let expected_ast =  AST::Call{
+            callee: "myFunction".to_string(),
+            args: vec![
+                Box::new(AST::Add {
+                    left: Box::new(AST::Number(1)),
+                    right: Box::new(AST::Number(1)),
+                }),
+                Box::new(AST::Id("a".to_string()))
+            ]
+        };
+        println!("{}",expected_ast);
+
+        if let Ok(expected_ast) = lang_parser::expression("myFunction(1+1 , a)") {
+            //  assert_eq!("varname", n)
+        } else {
+            panic!()
+        }
+    }
 }
