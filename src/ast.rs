@@ -84,6 +84,26 @@ mod tests {
     }
 
     #[test]
+    fn check_equals() {
+        let ast1 = AST::Add {
+            left: Box::new(AST::Number(1)),
+            right: Box::new(AST::Multiply {
+                left: Box::new(AST::Number(3)),
+                right: Box::new(AST::Number(3)),
+            })
+        };
+        let ast2 = AST::Add {
+            left: Box::new(AST::Number(1)),
+            right: Box::new(AST::Multiply {
+                left: Box::new(AST::Number(3)),
+                right: Box::new(AST::Number(3)),
+            })
+        };
+
+        assert_eq!(ast1, ast2);
+    }
+
+    #[test]
     fn add() {
         let ast = AST::Add {
             left: AST::Number(42).into(),

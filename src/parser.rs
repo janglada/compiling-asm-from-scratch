@@ -1,4 +1,3 @@
-
 use crate::ast::AST;
 use crate::ast2::ASTStruct;
 
@@ -11,14 +10,16 @@ peg::parser! {
       = n:$(['0'..='9']+) { AST::Number(n.parse().unwrap()) }
 
     pub rule Id() -> AST
-      = n:$([ 'a'..='z' | 'A'..='Z']['a'..='z' | 'A'..='Z' | '0'..='9' ]+) { AST::Id(n.to_string()) }
+      = n:$([ 'a'..='z' | 'A'..='Z']['a'..='z' | '_' |  'A'..='Z' | '0'..='9' ]+) { AST::Id(n.to_string()) }
 
 
     pub rule args() -> Vec<AST>
-      = l:(expression() ** ",") { l }
+      = expression() ** ","
 
+    ///
+    ///
     pub rule call() -> AST
-      = n:Id() "(" a:args() ")" {
+      = n:Id() _ "("  _ a:args() _ ")" {
       AST::Call {
         callee: n.to_string(),
         args:a.iter().cloned().map(|e| Box::new(e)).collect()
@@ -103,101 +104,88 @@ peg::parser! {
 
   }
 }
-pub fn parseNumber(input:&str) -> AST {
-  lang_parser::Number(input).unwrap()
-}
-pub fn parseId(input:&str) -> AST {
-  lang_parser::Id(input).unwrap()
-}
+
+
 #[cfg(test)]
 mod tests {
     use crate::ast;
-    use crate::ast2::Number;
-  use super::*;
+    use super::*;
 
-  #[test]
-  fn number() {
-
-    if let Ok(AST::Number(n)) = lang_parser::expression("1233") {
-      assert_eq!(1233, n)
-    } else {
-      panic!()
+    #[test]
+    fn number() {
+        assert_eq!(AST::Number(1233), lang_parser::expression("1233").expect("Parser failed"));
     }
 
-
-  }
-
-  #[test]
-  fn id() {
-
-    if let Ok(AST::Id(n)) = lang_parser::expression("varname") {
-      assert_eq!("varname", n)
-    } else {
-      panic!()
+    #[test]
+    fn id() {
+        assert_eq!(AST::Id("varname".to_string()), lang_parser::expression("varname").expect("Parser failed"));
+        assert_eq!(AST::Id("varname2".to_string()), lang_parser::expression("varname2").expect("Parser failed"));
+        assert_eq!(AST::Id("var_name2".to_string()), lang_parser::expression("var_name2").expect("Parser failed"));
     }
-
-    if let Ok(AST::Id(n)) = lang_parser::expression("varname2") {
-      assert_eq!("varname2", n)
-    } else {
-      panic!()
-    }
-
-  }
 
     #[test]
     fn arithmetic1() {
-        let expected_ast =  AST::Add{
+        let expected_ast = AST::Add {
             left: Box::new(AST::Number(1)),
             right: Box::new(AST::Multiply {
                 left: Box::new(AST::Number(3)),
                 right: Box::new(AST::Number(2)),
-            })
+            }),
         };
-        println!("{}",expected_ast);
-
-        if let Ok(expected_ast) = lang_parser::expression("1+3*2") {
-          //  assert_eq!("varname", n)
-        } else {
-            panic!()
-        }
+        println!("{}", expected_ast);
+        assert_eq!(expected_ast, lang_parser::expression("1+3*2").expect("Parser failed"))
     }
 
     #[test]
     fn arithmetic2() {
-        let expected_ast =  AST::Multiply{
+        let expected_ast = AST::Multiply {
             left: Box::new(AST::Add {
                 left: Box::new(AST::Number(1)),
                 right: Box::new(AST::Number(3)),
             }),
-            right: Box::new(AST::Number(2))
+            right: Box::new(AST::Number(2)),
         };
-        println!("{}",expected_ast);
+        println!("{}", expected_ast);
 
-        if let Ok(expected_ast) = lang_parser::expression("(1+3) * 2") {
-            //  assert_eq!("varname", n)
-        } else {
-            panic!()
-        }
+        assert_eq!(expected_ast, lang_parser::expression("(1+3) * 2").expect("Parser failed"));
+    }
+    #[test]
+    fn call_simple() {
+        let expected_ast = AST::Call {
+            callee: "fname".to_string(),
+            args: vec![]
+        };
+        println!("{}", expected_ast);
+        assert_eq!(expected_ast, lang_parser::expression("fname()").expect("Parser failed"));
     }
 
     #[test]
-    fn call() {
-        let expected_ast =  AST::Call{
+    fn call_w_args_vars() {
+
+
+
+        let expected_ast = AST::Call {
+            callee: "fname".to_string(),
+            args: vec![ Box::new(AST::Id("a".to_string())), Box::new(AST::Id("b".to_string()))]
+        };
+        println!("{}", expected_ast);
+        assert_eq!(expected_ast, lang_parser::expression("fname (a,b)").expect("Parser failed"));
+
+    }
+
+    #[test]
+    fn call_w_args() {
+        let expected_ast = AST::Call {
             callee: "myFunction".to_string(),
             args: vec![
                 Box::new(AST::Add {
                     left: Box::new(AST::Number(1)),
                     right: Box::new(AST::Number(1)),
                 }),
-                Box::new(AST::Id("a".to_string()))
-            ]
+                Box::new(AST::Id("a".to_string())),
+            ],
         };
-        println!("{}",expected_ast);
-
-        if let Ok(expected_ast) = lang_parser::expression("myFunction(1+1 , a)") {
-            //  assert_eq!("varname", n)
-        } else {
-            panic!()
-        }
+        println!("{}", expected_ast);
+        assert_eq!(expected_ast, lang_parser::expression("myFunction(1+1,a)").expect("Parser failed"));
     }
 }
