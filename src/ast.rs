@@ -24,7 +24,6 @@ use std::fmt;
 // }
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum AST {
-    Token(String),
     Number(u64),
     Id(String),
     Not(Box<AST>),
@@ -55,13 +54,13 @@ pub enum AST {
 
     Call {
         callee: String,
-        args: Vec<Box<AST>>,
+        args: Vec<AST>,
     },
     Return {
         term: Box<AST>,
     },
     Block {
-        statements: Vec<Box<AST>>,
+        statements: Vec<AST>,
     },
 
     IfNode {
@@ -91,7 +90,6 @@ pub enum AST {
 impl fmt::Display for AST {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> Result<(), fmt::Error> {
         match &self {
-            AST::Token(value) => write!(f, "TOKEN {}", value),
             AST::Number(value) => write!(f, "{}", value),
             AST::Id(name) => write!(f, "{}", name),
             AST::Not(value) => write!(f, "!{}", value),

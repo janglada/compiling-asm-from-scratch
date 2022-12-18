@@ -23,7 +23,7 @@ peg::parser! {
       = n:Id() _ "(" _ a:args() _ ")" {
       AST::Call {
         callee: n.to_string(),
-        args:a.iter().cloned().map(|e| Box::new(e)).collect()
+        args:a.iter().cloned().collect()
       }
     }
    ///
@@ -131,7 +131,7 @@ peg::parser! {
    rule blockStmt() -> AST
             =  "{" _  statements:statement()* _ "}"{
             AST::Block {
-                statements: statements.iter().cloned().map(|e| Box::new(e)).collect()
+                statements: statements.iter().cloned().collect()
             }
         }
     rule parameters() -> Vec<String>
@@ -300,8 +300,8 @@ mod tests {
         let expected_ast = AST::Call {
             callee: "fname".to_string(),
             args: vec![
-                Box::new(AST::Id("a".to_string())),
-                Box::new(AST::Id("b".to_string())),
+               AST::Id("a".to_string()),
+               AST::Id("b".to_string()),
             ],
         };
         println!("{}", expected_ast);
@@ -316,11 +316,11 @@ mod tests {
         let expected_ast = AST::Call {
             callee: "myFunction".to_string(),
             args: vec![
-                Box::new(AST::Add {
+                AST::Add {
                     left: Box::new(AST::Number(1)),
                     right: Box::new(AST::Number(1)),
-                }),
-                Box::new(AST::Id("a".to_string())),
+                },
+                AST::Id("a".to_string()),
             ],
         };
         println!("{}", expected_ast);
