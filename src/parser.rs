@@ -184,22 +184,33 @@ peg::parser! {
   }
 }
 
-
 #[cfg(test)]
 mod tests {
-    use crate::ast;
     use super::*;
+    use crate::ast;
 
     #[test]
     fn number() {
-        assert_eq!(AST::Number(1233), lang_parser::expression("1233").expect("Parser failed"));
+        assert_eq!(
+            AST::Number(1233),
+            lang_parser::expression("1233").expect("Parser failed")
+        );
     }
 
     #[test]
     fn id() {
-        assert_eq!(AST::Id("varname".to_string()), lang_parser::expression("varname").expect("Parser failed"));
-        assert_eq!(AST::Id("varname2".to_string()), lang_parser::expression("varname2").expect("Parser failed"));
-        assert_eq!(AST::Id("var_name2".to_string()), lang_parser::expression("var_name2").expect("Parser failed"));
+        assert_eq!(
+            AST::Id("varname".to_string()),
+            lang_parser::expression("varname").expect("Parser failed")
+        );
+        assert_eq!(
+            AST::Id("varname2".to_string()),
+            lang_parser::expression("varname2").expect("Parser failed")
+        );
+        assert_eq!(
+            AST::Id("var_name2".to_string()),
+            lang_parser::expression("var_name2").expect("Parser failed")
+        );
     }
 
     #[test]
@@ -212,7 +223,10 @@ mod tests {
             }),
         };
         println!("{}", expected_ast);
-        assert_eq!(expected_ast, lang_parser::expression("1+3*2").expect("Parser failed"))
+        assert_eq!(
+            expected_ast,
+            lang_parser::expression("1+3*2").expect("Parser failed")
+        )
     }
 
     #[test]
@@ -225,7 +239,10 @@ mod tests {
             }),
         };
         println!("{}", expected_ast);
-        assert_eq!(expected_ast, lang_parser::expression("a+b*c").expect("Parser failed"))
+        assert_eq!(
+            expected_ast,
+            lang_parser::expression("a+b*c").expect("Parser failed")
+        )
     }
 
     #[test]
@@ -239,44 +256,59 @@ mod tests {
         };
         println!("{}", expected_ast);
 
-        assert_eq!(expected_ast, lang_parser::expression("(1+3) * 2").expect("Parser failed"));
+        assert_eq!(
+            expected_ast,
+            lang_parser::expression("(1+3) * 2").expect("Parser failed")
+        );
     }
-
-
-
 
     #[test]
     fn call_simple() {
         let expected_ast = AST::Call {
             callee: "fname".to_string(),
-            args: vec![]
+            args: vec![],
         };
         println!("{}", expected_ast);
-        assert_eq!(expected_ast, lang_parser::expression("fname()").expect("Parser failed"));
+        assert_eq!(
+            expected_ast,
+            lang_parser::expression("fname()").expect("Parser failed")
+        );
     }
-
 
     #[test]
     fn args_w_whitespace() {
         let expected_ast = vec![AST::Id("a".to_string()), AST::Id("b".to_string())];
-        assert_eq!(expected_ast, lang_parser::args("a, b").expect("Parser failed"));
-        assert_eq!(expected_ast, lang_parser::args("a , b").expect("Parser failed"));
-        assert_eq!(expected_ast, lang_parser::args("a ,b").expect("Parser failed"));
-        assert_eq!(expected_ast, lang_parser::args("a   ,b").expect("Parser failed"));
-
+        assert_eq!(
+            expected_ast,
+            lang_parser::args("a, b").expect("Parser failed")
+        );
+        assert_eq!(
+            expected_ast,
+            lang_parser::args("a , b").expect("Parser failed")
+        );
+        assert_eq!(
+            expected_ast,
+            lang_parser::args("a ,b").expect("Parser failed")
+        );
+        assert_eq!(
+            expected_ast,
+            lang_parser::args("a   ,b").expect("Parser failed")
+        );
     }
     #[test]
     fn call_w_args_vars() {
-
-
-
         let expected_ast = AST::Call {
             callee: "fname".to_string(),
-            args: vec![ Box::new(AST::Id("a".to_string())), Box::new(AST::Id("b".to_string()))]
+            args: vec![
+                Box::new(AST::Id("a".to_string())),
+                Box::new(AST::Id("b".to_string())),
+            ],
         };
         println!("{}", expected_ast);
-        assert_eq!(expected_ast, lang_parser::expression("fname (a,b)").expect("Parser failed"));
-
+        assert_eq!(
+            expected_ast,
+            lang_parser::expression("fname (a,b)").expect("Parser failed")
+        );
     }
 
     #[test]
@@ -292,6 +324,9 @@ mod tests {
             ],
         };
         println!("{}", expected_ast);
-        assert_eq!(expected_ast, lang_parser::expression("myFunction(1+1,a)").expect("Parser failed"));
+        assert_eq!(
+            expected_ast,
+            lang_parser::expression("myFunction(1+1,a)").expect("Parser failed")
+        );
     }
 }

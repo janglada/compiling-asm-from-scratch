@@ -1,8 +1,6 @@
 use std::cmp;
 
-pub trait ASTStruct {
-
-}
+pub trait ASTStruct {}
 
 #[derive(PartialEq, PartialOrd)]
 pub struct Number {
@@ -10,12 +8,10 @@ pub struct Number {
 }
 
 impl Number {
-    pub fn new(value: f64)-> Self {
-        Number {value}
+    pub fn new(value: f64) -> Self {
+        Number { value }
     }
 }
-
-
 
 #[derive(PartialEq, PartialOrd)]
 pub struct Id {
@@ -113,5 +109,3 @@ impl ASTStruct for Not {}
 // impl AST for Var {}
 // impl AST for Assign {}
 // impl AST for While {}
-
-
