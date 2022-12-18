@@ -10,31 +10,24 @@ peg::parser! {
       = n:$(['0'..='9']+) { AST::Number(n.parse().unwrap()) }
 
     pub rule Id() -> AST
-      = n:$([ 'a'..='z' | 'A'..='Z']['a'..='z' | '_' |  'A'..='Z' | '0'..='9' ]+) { AST::Id(n.to_string()) }
+      = n:$([ 'a'..='z' | 'A'..='Z']['a'..='z' | '_' |  'A'..='Z' | '0'..='9' ]*) { AST::Id(n.to_string()) }
 
 
     pub rule args() -> Vec<AST>
-      = expression() ** ","
+      = expression() ** (_ "," _)
+
 
     ///
     ///
     pub rule call() -> AST
-      = n:Id() _ "("  _ a:args() _ ")" {
+      = n:Id() _ "(" _ a:args() _ ")" {
       AST::Call {
         callee: n.to_string(),
         args:a.iter().cloned().map(|e| Box::new(e)).collect()
       }
     }
-
-    pub rule unary() -> AST
-      = n:"!"? a:atom() {
-        match n {
-          Some(term) => AST::Not(Box::new(a)),
-          None => a
-      }
-    }
-
-
+   ///
+   /// INFIX
    rule sum() -> AST
         = l:product() _ op:$("+" / "-") _ r:product() {
              let ast = match op {
@@ -43,8 +36,7 @@ peg::parser! {
                  x => panic!("sum found op {}", x)
             };
             ast
-        }
-        / product()
+        } / product()
 
     rule product() -> AST
         = l:comparison() _ op:$("*" / "/") _ r:comparison() {
@@ -68,37 +60,124 @@ peg::parser! {
                 };
                 ast
 
-            } / atom()
+            } / unary()
 
-    pub rule atom() -> AST
+    rule unary() -> AST
+      = n:("!")? a:atom() {
+        match n {
+          Some(term) => AST::Not(Box::new(a)),
+          None => a
+      }
+    }
+    rule atom() -> AST
       = call() / Id() / Number() / "("  e:sum() ")" { e }
 
-
-      pub rule expression() -> AST
+    pub rule expression() -> AST
             = sum()
 
+    ///
+    /// Statements
+    ///
+    rule returnStmt() -> AST
+            = RETURN()  _ e:expression() _ ";" {
+            AST::Return {
+                term: Box::new(e)
+            }
+        }
 
+    rule exprStmt() -> AST
+            = e:expression() _ ";" { e }
+
+   rule ifStmt() -> AST
+            = IF()  _ "(" _ conditional: expression()  _ ")"  _ consequence: statement() _ ELSE()  _ alternative: statement() {
+            AST::IfNode {
+                conditional: Box::new(conditional),
+                consequence: Box::new(consequence),
+                alternative: Box::new(alternative)
+            }
+        }
+
+
+   rule whileStmt() -> AST
+            = WHILE()  _ "(" _ conditional: expression()  _ ")"  _ body: statement() _{
+            AST::Wile {
+                conditional: Box::new(conditional),
+                body: Box::new(body)
+            }
+        }
+
+   rule varStmt() -> AST
+            = VAR()  _ id:Id() _ ASSIGN() _ value:expression() ";" _{
+            if let AST::Id(name) = id {
+                AST::Var {
+                    name: name.clone(),
+                    value: Box::new(value)
+                }
+            }  else {
+                unreachable!()
+            }
+        }
+   rule assignmentStmt() -> AST
+            =  _ id:Id() _ ASSIGN() _ value:expression() ";" _ {
+              if let AST::Id(name) = id {
+                AST::Assign {
+                    name: name.clone(),
+                    value: Box::new(value)
+                }
+            }  else {
+                unreachable!()
+            }
+        }
+   rule blockStmt() -> AST
+            =  "{" _  statements:statement()* _ "}"{
+            AST::Block {
+                statements: statements.iter().cloned().map(|e| Box::new(e)).collect()
+            }
+        }
+    rule parameters() -> Vec<String>
+      = ids:Id() ** (_ "," _) {
+            ids.iter().cloned().map(|item|  {
+                 if let AST::Id(name) = item {
+                     name
+                    } else {
+                     unreachable!()
+                }
+            }).collect()
+        }
+
+   rule functionStmt() -> AST
+            =  FUNCTION() _ id: Id() _ "(" _ p: parameters() _ ")" _ body:blockStmt() {
+               if let AST::Id(name) = id {
+
+                AST::Function {
+                    name: name.clone(),
+                    parameters: p,
+                    body: Box::new(body)
+                }
+                } else {
+                     unreachable!()
+                }
+    }
+
+        rule statement() -> AST
+        = returnStmt() / ifStmt() / whileStmt() / varStmt() / assignmentStmt() / blockStmt() / functionStmt() / exprStmt()
 
     ///
     /// keywords
     ///
-    pub rule FUNCTION() -> AST
-      = "function"  { AST::Token("function".to_string()) }
+    ///
+     pub rule ASSIGN() = "="
+    pub rule FUNCTION() = "function"
 
-    pub rule IF() -> AST
-      = "if"  { AST::Token("if".to_string()) }
+    pub rule IF() = "if"
 
-    pub rule ELSE() -> AST
-      = "else"  { AST::Token("else".to_string()) }
+    pub rule ELSE() = "else"
 
-    pub rule RETURN() -> AST
-      = "return"  { AST::Token("return".to_string()) }
+    pub rule RETURN() = "return"
 
-    pub rule VAR() -> AST
-      = "var"  { AST::Token("var".to_string()) }
+    pub rule VAR() = "var"
 
-    pub rule WHILE() -> AST
-      = "while"  { AST::Token("while".to_string()) }
+    pub rule WHILE() = "while"
 
 
 
@@ -137,6 +216,19 @@ mod tests {
     }
 
     #[test]
+    fn arithmetic_wvars() {
+        let expected_ast = AST::Add {
+            left: Box::new(AST::Id("a".to_string())),
+            right: Box::new(AST::Multiply {
+                left: Box::new(AST::Id("b".to_string())),
+                right: Box::new(AST::Id("c".to_string())),
+            }),
+        };
+        println!("{}", expected_ast);
+        assert_eq!(expected_ast, lang_parser::expression("a+b*c").expect("Parser failed"))
+    }
+
+    #[test]
     fn arithmetic2() {
         let expected_ast = AST::Multiply {
             left: Box::new(AST::Add {
@@ -149,6 +241,10 @@ mod tests {
 
         assert_eq!(expected_ast, lang_parser::expression("(1+3) * 2").expect("Parser failed"));
     }
+
+
+
+
     #[test]
     fn call_simple() {
         let expected_ast = AST::Call {
@@ -159,6 +255,16 @@ mod tests {
         assert_eq!(expected_ast, lang_parser::expression("fname()").expect("Parser failed"));
     }
 
+
+    #[test]
+    fn args_w_whitespace() {
+        let expected_ast = vec![AST::Id("a".to_string()), AST::Id("b".to_string())];
+        assert_eq!(expected_ast, lang_parser::args("a, b").expect("Parser failed"));
+        assert_eq!(expected_ast, lang_parser::args("a , b").expect("Parser failed"));
+        assert_eq!(expected_ast, lang_parser::args("a ,b").expect("Parser failed"));
+        assert_eq!(expected_ast, lang_parser::args("a   ,b").expect("Parser failed"));
+
+    }
     #[test]
     fn call_w_args_vars() {
 
