@@ -1,4 +1,4 @@
-use std::cmp;
+
 
 pub trait ASTStruct {}
 
@@ -8,9 +8,7 @@ pub struct Number {
 }
 
 impl Number {
-    pub fn new(value: f64) -> Self {
-        Number { value }
-    }
+
 }
 
 #[derive(PartialEq, PartialOrd)]

@@ -1,27 +1,6 @@
 use std::fmt;
 
-// pub trait AST {
-//     fn equals(&self, other: &dyn AST) -> bool;
-// }
-//
-//
-// pub struct Node {
-//     value: f64
-// }
-//
-// impl AST for Node {
-//     fn equals(&self, other: &dyn AST) -> bool {
-//         o
-//     }
-// }
-//
-// pub struct Id {
-//     value: f64
-// }
-//
-// pub struct Not<'a> {
-//     term: &'a dyn AST
-// }
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum AST {
     Number(u64),

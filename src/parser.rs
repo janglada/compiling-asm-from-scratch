@@ -1,5 +1,4 @@
 use crate::ast::AST;
-use crate::ast2::ASTStruct;
 
 peg::parser! {
   grammar lang_parser() for str {
@@ -187,7 +186,6 @@ peg::parser! {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::ast;
 
     #[test]
     fn number() {
