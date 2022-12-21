@@ -37,9 +37,7 @@ pub enum AST {
     Return {
         term: Box<AST>,
     },
-    Block {
-        statements: Vec<AST>,
-    },
+    Block(Vec<AST>),
 
     IfNode {
         conditional: Box<AST>,
@@ -79,7 +77,7 @@ impl fmt::Display for AST {
             AST::Divide { left, right } => write!(f, "({} / {})", left, right),
             AST::Call { callee, args } => write!(f, "{} ({:?})", callee, args),
             AST::Return { term } => write!(f, "return {} ", term),
-            AST::Block { statements } => {
+            AST::Block(statements) => {
                 writeln!(f, "{{").unwrap();
                 for stmt in statements {
                     writeln!(f, " {};", stmt).unwrap();

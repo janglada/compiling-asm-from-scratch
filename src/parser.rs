@@ -98,7 +98,7 @@ peg::parser! {
 
 
    pub rule whileStmt() -> AST
-            = "while"  _ "(" _ conditional: expression()  _ ")"  _   body: statement()  _ {
+            = "while"  _ "(" _ conditional: expression()  _ ")"  _   body: statement()  {
             AST::While {
                 conditional: conditional.into(),
                 body: body.into()
@@ -117,7 +117,7 @@ peg::parser! {
             }
         }
    rule assignmentStmt() -> AST
-            =  _ id:Id() _ ASSIGN() _ value:expression() ";" _ {
+            =  id:Id() _ ASSIGN() _ value:expression() _ ";" _ {
               if let AST::Id(name) = id {
                 AST::Assign {
                     name,
@@ -129,9 +129,7 @@ peg::parser! {
         }
    rule blockStmt() -> AST
             =  "{" _  statements:statement()* _ "}"{
-            AST::Block {
-                statements: statements.to_vec()
-            }
+            AST::Block(statements.to_vec())
         }
     rule parameters() -> Vec<String>
       = ids:Id() ** (_ "," _) {
@@ -187,6 +185,7 @@ peg::parser! {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::ast::AST::Block;
 
     #[test]
     fn number() {
@@ -400,18 +399,16 @@ mod tests {
     }
     #[test]
     fn block_stmt() {
-        let expected_ast = AST::Block {
-            statements: vec![
-                AST::Var {
-                    name: "a".to_string(),
-                    value: AST::Number(1).into(),
-                },
-                AST::Var {
-                    name: "b".to_string(),
-                    value: AST::Number(2).into(),
-                },
-            ],
-        };
+        let expected_ast = AST::Block(vec![
+            AST::Var {
+                name: "a".to_string(),
+                value: AST::Number(1).into(),
+            },
+            AST::Var {
+                name: "b".to_string(),
+                value: AST::Number(2).into(),
+            },
+        ]);
         println!("{}", expected_ast);
         assert_eq!(
             expected_ast,
@@ -428,15 +425,15 @@ mod tests {
     fn if_stmt() {
         let expected_ast = AST::IfNode {
             conditional: AST::Id("a".to_string()).into(),
-            consequence: AST::Assign {
+            consequence: AST::Block(vec![AST::Assign {
                 name: "a".to_string(),
                 value: AST::Number(1).into(),
-            }
+            }])
             .into(),
-            alternative: AST::Assign {
+            alternative: AST::Block(vec![AST::Assign {
                 name: "a".to_string(),
                 value: AST::Number(0).into(),
-            }
+            }])
             .into(),
         };
 
@@ -444,18 +441,13 @@ mod tests {
         assert_eq!(
             expected_ast,
             lang_parser::statement(
-                r#"
-            if (a) {
-                a = 1 ;
+                r#"if (a) {
+               a = 1;
             } else {
-                a = 0 ;
+                a = 0;
             }"#
             )
             .expect("Parser failed")
-        );
-        assert_eq!(
-            expected_ast,
-            lang_parser::statement("return    1 + 1;").expect("Parser failed")
         );
     }
 
@@ -463,10 +455,10 @@ mod tests {
     fn while_stmt() {
         let expected_ast = AST::While {
             conditional: AST::Id("a".into()).into(),
-            body: AST::Assign {
+            body: AST::Block(vec![AST::Assign {
                 name: "b".to_string(),
                 value: AST::Number(1).into(),
-            }
+            }])
             .into(),
         };
 
@@ -475,8 +467,8 @@ mod tests {
             expected_ast,
             lang_parser::whileStmt(
                 r#"while(a) {
-                b = 1 ;
-            };"#
+                b = 1;
+            }"#
             )
             .expect("Parser failed")
         );
