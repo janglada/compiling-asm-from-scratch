@@ -1,6 +1,5 @@
 use std::fmt;
 
-
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum AST {
     Number(u64),
@@ -60,7 +59,7 @@ pub enum AST {
         name: String,
         value: Box<AST>,
     },
-    Wile {
+    While {
         conditional: Box<AST>,
         body: Box<AST>,
     },
@@ -80,14 +79,20 @@ impl fmt::Display for AST {
             AST::Divide { left, right } => write!(f, "({} / {})", left, right),
             AST::Call { callee, args } => write!(f, "{} ({:?})", callee, args),
             AST::Return { term } => write!(f, "return {} ", term),
-            AST::Block { statements } => write!(f, "{{\n {:?} }}", statements),
+            AST::Block { statements } => {
+                writeln!(f, "{{").unwrap();
+                for stmt in statements {
+                    writeln!(f, " {};", stmt).unwrap();
+                }
+                write!(f, "}}")
+            }
             AST::IfNode {
                 conditional,
                 consequence,
                 alternative,
             } => write!(
                 f,
-                "if ({}) \n{{\n {:?} \n}} else {{ {:?}}} ",
+                "if ({}) \n{{\n {} \n}} else {{ \n{}\n}} ",
                 conditional, consequence, alternative
             ),
             AST::Function {
@@ -96,29 +101,27 @@ impl fmt::Display for AST {
                 body,
             } => write!(
                 f,
-                "function  {}({:?})  \n{{\n {:?} \n}}",
+                "function  {}({:?})  \n{{\n {} \n}}",
                 name, parameters, body
             ),
             AST::Var { name, value } => write!(f, "var {} = {}", name, value),
             AST::Assign { name, value } => write!(f, " {} = {}", name, value),
-            AST::Wile { conditional, body } => {
-                write!(f, "while ({}) \n{{\n {:?} \n}}  ", conditional, body)
+            AST::While { conditional, body } => {
+                write!(f, "while ({}) \n{{\n {} \n}}  ", conditional, body)
             }
         }
     }
 }
 
+// impl Into<Box<AST>> for AST {
+//     fn into(self) -> Box<AST> {
+//         Box::new(self)
+//     }
+// }
+
 #[cfg(test)]
 mod tests {
     use crate::ast::AST;
-
-    #[test]
-    fn it_works() {
-        AST::Equal {
-            left: Box::new(AST::Id("x".to_string())),
-            right: Box::new(AST::Id("y".to_string())),
-        };
-    }
 
     #[test]
     fn check_equals() {

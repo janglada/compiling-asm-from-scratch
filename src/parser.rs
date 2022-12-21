@@ -22,29 +22,29 @@ peg::parser! {
       = n:Id() _ "(" _ a:args() _ ")" {
       AST::Call {
         callee: n.to_string(),
-        args:a.iter().cloned().collect()
+        args:a.to_vec()
       }
     }
    ///
    /// INFIX
    rule sum() -> AST
         = l:product() _ op:$("+" / "-") _ r:product() {
-             let ast = match op {
-                "+" =>  AST::Add{left:Box::new(l), right:Box::new(r)},
-                "-" =>  AST::Subtract{left:Box::new(l), right:Box::new(r)},
+
+            match op {
+                "+" =>  AST::Add{left:l.into(), right:r.into()},
+                "-" =>  AST::Subtract{left:l.into(), right:r.into()},
                  x => panic!("sum found op {}", x)
-            };
-            ast
+            }
         } / product()
 
     rule product() -> AST
         = l:comparison() _ op:$("*" / "/") _ r:comparison() {
-            let ast = match op {
-                "*" =>  AST::Multiply{left:Box::new(l), right:Box::new(r)},
-                "/" =>  AST::Divide{left:Box::new(l), right:Box::new(r)},
+
+            match op {
+                "*" =>  AST::Multiply{left:l.into(), right:r.into()},
+                "/" =>  AST::Divide{left:l.into(), right:r.into()},
                  x => panic!("product found op {}", x)
-            };
-            ast
+            }
 
         }
         / comparison()
@@ -52,19 +52,19 @@ peg::parser! {
 
         rule comparison() -> AST
             = l:atom() _ op:$("==" / "!=") _ r:atom() {
-                let ast = match op {
-                    "==" =>  AST::Equal{left:Box::new(l), right:Box::new(r)},
-                    "!=" =>  AST::NotEqual{left:Box::new(l), right:Box::new(r)},
+
+                match op {
+                    "==" =>  AST::Equal{left: l.into(), right: r.into()},
+                    "!=" =>  AST::NotEqual{left:l.into(), right:r.into()},
                 x => panic!("comparison found op {}", x)
-                };
-                ast
+                }
 
             } / unary()
 
     rule unary() -> AST
       = n:("!")? a:atom() {
         match n {
-          Some(term) => AST::Not(Box::new(a)),
+          Some(term) => AST::Not(a.into()),
           None => a
       }
     }
@@ -80,37 +80,37 @@ peg::parser! {
     rule returnStmt() -> AST
             = RETURN()  _ e:expression() _ ";" {
             AST::Return {
-                term: Box::new(e)
+                term: e.into()
             }
         }
 
-    rule exprStmt() -> AST
+   pub rule exprStmt() -> AST
             = e:expression() _ ";" { e }
 
-   rule ifStmt() -> AST
-            = IF()  _ "(" _ conditional: expression()  _ ")"  _ consequence: statement() _ ELSE()  _ alternative: statement() {
+   pub  rule ifStmt() -> AST
+            = "if"  _ "(" _ conditional: expression()  _ ")"  _ consequence: statement() _ ELSE()  _ alternative: statement() {
             AST::IfNode {
-                conditional: Box::new(conditional),
-                consequence: Box::new(consequence),
-                alternative: Box::new(alternative)
+                conditional: conditional.into(),
+                consequence: consequence.into(),
+                alternative: alternative.into()
             }
         }
 
 
-   rule whileStmt() -> AST
-            = WHILE()  _ "(" _ conditional: expression()  _ ")"  _ body: statement() _{
-            AST::Wile {
-                conditional: Box::new(conditional),
-                body: Box::new(body)
+   pub rule whileStmt() -> AST
+            = "while"  _ "(" _ conditional: expression()  _ ")"  _   body: statement()  _ {
+            AST::While {
+                conditional: conditional.into(),
+                body: body.into()
             }
         }
 
-   rule varStmt() -> AST
-            = VAR()  _ id:Id() _ ASSIGN() _ value:expression() ";" _{
+  pub rule varStmt() -> AST
+            = VAR()  _ id:Id() _ ASSIGN() _ value:expression() _ ";" _{
             if let AST::Id(name) = id {
                 AST::Var {
-                    name: name.clone(),
-                    value: Box::new(value)
+                    name,
+                    value: value.into()
                 }
             }  else {
                 unreachable!()
@@ -120,8 +120,8 @@ peg::parser! {
             =  _ id:Id() _ ASSIGN() _ value:expression() ";" _ {
               if let AST::Id(name) = id {
                 AST::Assign {
-                    name: name.clone(),
-                    value: Box::new(value)
+                    name,
+                    value: value.into()
                 }
             }  else {
                 unreachable!()
@@ -130,7 +130,7 @@ peg::parser! {
    rule blockStmt() -> AST
             =  "{" _  statements:statement()* _ "}"{
             AST::Block {
-                statements: statements.iter().cloned().collect()
+                statements: statements.to_vec()
             }
         }
     rule parameters() -> Vec<String>
@@ -149,23 +149,24 @@ peg::parser! {
                if let AST::Id(name) = id {
 
                 AST::Function {
-                    name: name.clone(),
+                    name,
                     parameters: p,
-                    body: Box::new(body)
+                    body: body.into()
                 }
                 } else {
                      unreachable!()
                 }
     }
 
-        rule statement() -> AST
+   pub rule statement() -> AST
         = returnStmt() / ifStmt() / whileStmt() / varStmt() / assignmentStmt() / blockStmt() / functionStmt() / exprStmt()
 
     ///
     /// keywords
     ///
     ///
-     pub rule ASSIGN() = "="
+    pub rule ASSIGN() = "="
+
     pub rule FUNCTION() = "function"
 
     pub rule IF() = "if"
@@ -214,11 +215,12 @@ mod tests {
     #[test]
     fn arithmetic1() {
         let expected_ast = AST::Add {
-            left: Box::new(AST::Number(1)),
-            right: Box::new(AST::Multiply {
-                left: Box::new(AST::Number(3)),
-                right: Box::new(AST::Number(2)),
-            }),
+            left: AST::Number(1).into(),
+            right: AST::Multiply {
+                left: AST::Number(3).into(),
+                right: AST::Number(2).into(),
+            }
+            .into(),
         };
         println!("{}", expected_ast);
         assert_eq!(
@@ -230,11 +232,12 @@ mod tests {
     #[test]
     fn arithmetic_wvars() {
         let expected_ast = AST::Add {
-            left: Box::new(AST::Id("a".to_string())),
-            right: Box::new(AST::Multiply {
-                left: Box::new(AST::Id("b".to_string())),
-                right: Box::new(AST::Id("c".to_string())),
-            }),
+            left: AST::Id("a".to_string()).into(),
+            right: AST::Multiply {
+                left: AST::Id("b".to_string()).into(),
+                right: AST::Id("c".to_string()).into(),
+            }
+            .into(),
         };
         println!("{}", expected_ast);
         assert_eq!(
@@ -246,11 +249,12 @@ mod tests {
     #[test]
     fn arithmetic2() {
         let expected_ast = AST::Multiply {
-            left: Box::new(AST::Add {
-                left: Box::new(AST::Number(1)),
-                right: Box::new(AST::Number(3)),
-            }),
-            right: Box::new(AST::Number(2)),
+            left: AST::Add {
+                left: AST::Number(1).into(),
+                right: AST::Number(3).into(),
+            }
+            .into(),
+            right: AST::Number(2).into(),
         };
         println!("{}", expected_ast);
 
@@ -258,6 +262,21 @@ mod tests {
             expected_ast,
             lang_parser::expression("(1+3) * 2").expect("Parser failed")
         );
+    }
+
+    ///
+    ///
+    #[test]
+    fn comparison() {
+        let expected_ast = AST::NotEqual {
+            left: AST::Number(1).into(),
+            right: AST::Number(2).into(),
+        };
+        println!("{}", expected_ast);
+        assert_eq!(
+            expected_ast,
+            lang_parser::expression("1 != 2").expect("Parser failed")
+        )
     }
 
     #[test]
@@ -293,14 +312,12 @@ mod tests {
             lang_parser::args("a   ,b").expect("Parser failed")
         );
     }
+
     #[test]
     fn call_w_args_vars() {
         let expected_ast = AST::Call {
             callee: "fname".to_string(),
-            args: vec![
-               AST::Id("a".to_string()),
-               AST::Id("b".to_string()),
-            ],
+            args: vec![AST::Id("a".to_string()), AST::Id("b".to_string())],
         };
         println!("{}", expected_ast);
         assert_eq!(
@@ -315,8 +332,8 @@ mod tests {
             callee: "myFunction".to_string(),
             args: vec![
                 AST::Add {
-                    left: Box::new(AST::Number(1)),
-                    right: Box::new(AST::Number(1)),
+                    left: AST::Number(1).into(),
+                    right: AST::Number(1).into(),
                 },
                 AST::Id("a".to_string()),
             ],
@@ -325,6 +342,143 @@ mod tests {
         assert_eq!(
             expected_ast,
             lang_parser::expression("myFunction(1+1,a)").expect("Parser failed")
+        );
+    }
+
+    #[test]
+    fn var_assign() {
+        let expected_ast = AST::Var {
+            name: "a".to_string(),
+            value: AST::Number(1).into(),
+        };
+        println!("{}", expected_ast);
+        assert_eq!(
+            expected_ast,
+            lang_parser::statement("var a = 1;").expect("Parser failed")
+        );
+        assert_eq!(
+            expected_ast,
+            lang_parser::statement("var a=1;").expect("Parser failed")
+        );
+    }
+
+    #[test]
+    fn assign() {
+        let expected_ast = AST::Assign {
+            name: "a".to_string(),
+            value: AST::Number(1).into(),
+        };
+        println!("{}", expected_ast);
+        assert_eq!(
+            expected_ast,
+            lang_parser::statement("a = 1;").expect("Parser failed")
+        );
+        assert_eq!(
+            expected_ast,
+            lang_parser::statement("a=1;").expect("Parser failed")
+        );
+    }
+
+    #[test]
+    fn return_stmt() {
+        let expected_ast = AST::Return {
+            term: AST::Add {
+                left: AST::Number(1).into(),
+                right: AST::Number(1).into(),
+            }
+            .into(),
+        };
+        println!("{}", expected_ast);
+        assert_eq!(
+            expected_ast,
+            lang_parser::statement("return 1 + 1;").expect("Parser failed")
+        );
+        assert_eq!(
+            expected_ast,
+            lang_parser::statement("return    1 + 1;").expect("Parser failed")
+        );
+    }
+    #[test]
+    fn block_stmt() {
+        let expected_ast = AST::Block {
+            statements: vec![
+                AST::Var {
+                    name: "a".to_string(),
+                    value: AST::Number(1).into(),
+                },
+                AST::Var {
+                    name: "b".to_string(),
+                    value: AST::Number(2).into(),
+                },
+            ],
+        };
+        println!("{}", expected_ast);
+        assert_eq!(
+            expected_ast,
+            lang_parser::statement(
+                r#"{
+                var a = 1;
+                var b = 2;
+             }"#
+            )
+            .expect("Parser failed")
+        );
+    }
+    #[test]
+    fn if_stmt() {
+        let expected_ast = AST::IfNode {
+            conditional: AST::Id("a".to_string()).into(),
+            consequence: AST::Assign {
+                name: "a".to_string(),
+                value: AST::Number(1).into(),
+            }
+            .into(),
+            alternative: AST::Assign {
+                name: "a".to_string(),
+                value: AST::Number(0).into(),
+            }
+            .into(),
+        };
+
+        println!("{}", expected_ast);
+        assert_eq!(
+            expected_ast,
+            lang_parser::statement(
+                r#"
+            if (a) {
+                a = 1 ;
+            } else {
+                a = 0 ;
+            }"#
+            )
+            .expect("Parser failed")
+        );
+        assert_eq!(
+            expected_ast,
+            lang_parser::statement("return    1 + 1;").expect("Parser failed")
+        );
+    }
+
+    #[test]
+    fn while_stmt() {
+        let expected_ast = AST::While {
+            conditional: AST::Id("a".into()).into(),
+            body: AST::Assign {
+                name: "b".to_string(),
+                value: AST::Number(1).into(),
+            }
+            .into(),
+        };
+
+        println!("{}", expected_ast);
+        assert_eq!(
+            expected_ast,
+            lang_parser::whileStmt(
+                r#"while(a) {
+                b = 1 ;
+            };"#
+            )
+            .expect("Parser failed")
         );
     }
 }
