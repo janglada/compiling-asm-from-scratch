@@ -75,8 +75,13 @@ impl fmt::Display for AST {
             AST::Subtract { left, right } => write!(f, "({} - {})", left, right),
             AST::Multiply { left, right } => write!(f, "({} * {})", left, right),
             AST::Divide { left, right } => write!(f, "({} / {})", left, right),
-            AST::Call { callee, args } => write!(f, "{} ({:?})", callee, args),
-            AST::Return { term } => write!(f, "return {} ", term),
+            AST::Call { callee, args } => write!(
+                f,
+                "{} ({})",
+                callee,
+                args.iter().map(|x| x.to_string() + ",").collect::<String>()
+            ),
+            AST::Return { term } => write!(f, "return {}", term),
             AST::Block(statements) => {
                 writeln!(f, "{{").unwrap();
                 for stmt in statements {
@@ -90,7 +95,7 @@ impl fmt::Display for AST {
                 alternative,
             } => write!(
                 f,
-                "if ({}) \n{{\n {} \n}} else {{ \n{}\n}} ",
+                "if ({})\n{}\n else\n{}",
                 conditional, consequence, alternative
             ),
             AST::Function {
@@ -99,13 +104,15 @@ impl fmt::Display for AST {
                 body,
             } => write!(
                 f,
-                "function  {}({:?})  \n{{\n {} \n}}",
-                name, parameters, body
+                "function  {}({})\n{}\n",
+                name,
+                parameters.join(","),
+                body
             ),
             AST::Var { name, value } => write!(f, "var {} = {}", name, value),
-            AST::Assign { name, value } => write!(f, " {} = {}", name, value),
+            AST::Assign { name, value } => write!(f, "{} = {}", name, value),
             AST::While { conditional, body } => {
-                write!(f, "while ({}) \n{{\n {} \n}}  ", conditional, body)
+                write!(f, "while ({})\n{}", conditional, body)
             }
         }
     }

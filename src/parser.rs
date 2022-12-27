@@ -98,7 +98,7 @@ peg::parser! {
 
 
    pub rule whileStmt() -> AST
-            = "while"  _ "(" _ conditional: expression()  _ ")"  _   body: statement()  {
+            = "while"  _ "(" _ conditional: expression()  _ ")"  _   body: statement() _ {
             AST::While {
                 conditional: conditional.into(),
                 body: body.into()
@@ -391,9 +391,13 @@ mod tests {
             expected_ast,
             lang_parser::statement("return 1 + 1;").expect("Parser failed")
         );
+        let expected_ast = AST::Return {
+            term: AST::Id("a".to_string()).into(),
+        };
+        println!("{}", expected_ast);
         assert_eq!(
             expected_ast,
-            lang_parser::statement("return    1 + 1;").expect("Parser failed")
+            lang_parser::statement("return   a;").expect("Parser failed")
         );
     }
     #[test]
@@ -454,10 +458,16 @@ mod tests {
     fn while_stmt() {
         let expected_ast = AST::While {
             conditional: AST::Id("a".into()).into(),
-            body: AST::Block(vec![AST::Assign {
-                name: "b".to_string(),
-                value: AST::Number(1).into(),
-            }])
+            body: AST::Block(vec![
+                AST::Assign {
+                    name: "b".to_string(),
+                    value: AST::Number(1).into(),
+                },
+                AST::Assign {
+                    name: "a".to_string(),
+                    value: AST::Number(2).into(),
+                },
+            ])
             .into(),
         };
 
@@ -467,6 +477,7 @@ mod tests {
             lang_parser::statement(
                 r#"while(a) {
                 b = 1;
+                a = 2;
             }"#
             )
             .expect("Parser failed")
@@ -476,10 +487,23 @@ mod tests {
     fn function_stmt() {
         let expected_ast = AST::Function {
             name: "myFunc".to_string(),
-            body: AST::Block(vec![AST::Assign {
-                name: "b".to_string(),
-                value: AST::Number(1).into(),
-            }])
+            body: AST::Block(vec![
+                AST::Assign {
+                    name: "b".to_string(),
+                    value: AST::Number(1).into(),
+                },
+                AST::While {
+                    conditional: AST::Id("a".into()).into(),
+                    body: AST::Block(vec![AST::Assign {
+                        name: "b".to_string(),
+                        value: AST::Number(1).into(),
+                    }])
+                    .into(),
+                },
+                AST::Return {
+                    term: AST::Id("a".to_string()).into(),
+                },
+            ])
             .into(),
             parameters: vec![String::from("a"), String::from("b")],
         };
@@ -490,7 +514,72 @@ mod tests {
             lang_parser::statement(
                 r#"function myFunc(a, b) {
                 b = 1;
+                while (a) {
+                    b = 1;
+                }
+                return a;
             }"#
+            )
+            .expect("Parser failed")
+        );
+    }
+
+    #[test]
+    fn factorial() {
+        let expected_ast = AST::Function {
+            name: "factorial".to_string(),
+            parameters: vec![String::from("n")],
+
+            body: AST::Block(vec![
+                AST::Var {
+                    name: "result".to_string(),
+                    value: AST::Number(1).into(),
+                },
+                AST::While {
+                    conditional: AST::NotEqual {
+                        left: AST::Id(String::from("n")).into(),
+                        right: AST::Number(1).into(),
+                    }
+                    .into(),
+                    body: AST::Block(vec![
+                        AST::Assign {
+                            name: "result".to_string(),
+                            value: AST::Multiply {
+                                left: AST::Id(String::from("result")).into(),
+                                right: AST::Id(String::from("n")).into(),
+                            }
+                            .into(),
+                        },
+                        AST::Assign {
+                            name: "n".to_string(),
+                            value: AST::Subtract {
+                                left: AST::Id(String::from("n")).into(),
+                                right: AST::Number(1).into(),
+                            }
+                            .into(),
+                        },
+                    ])
+                    .into(),
+                },
+                AST::Return {
+                    term: AST::Id("result".to_string()).into(),
+                },
+            ])
+            .into(),
+        };
+
+        println!("{}", expected_ast);
+        assert_eq!(
+            expected_ast,
+            lang_parser::statement(
+                r#"function factorial(n) {
+    var result = 1;
+    while (n != 1) {
+        result = result * n;
+        n = n - 1;
+    }
+    return result; 
+}"#
             )
             .expect("Parser failed")
         );
