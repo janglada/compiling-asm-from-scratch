@@ -142,7 +142,7 @@ peg::parser! {
             }).collect()
         }
 
-   rule functionStmt() -> AST
+   pub rule functionStmt() -> AST
             =  FUNCTION() _ id: Id() _ "(" _ p: parameters() _ ")" _ body:blockStmt() {
                if let AST::Id(name) = id {
 
@@ -185,7 +185,6 @@ peg::parser! {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::ast::AST::Block;
 
     #[test]
     fn number() {
@@ -465,8 +464,31 @@ mod tests {
         println!("{}", expected_ast);
         assert_eq!(
             expected_ast,
-            lang_parser::whileStmt(
+            lang_parser::statement(
                 r#"while(a) {
+                b = 1;
+            }"#
+            )
+            .expect("Parser failed")
+        );
+    }
+    #[test]
+    fn function_stmt() {
+        let expected_ast = AST::Function {
+            name: "myFunc".to_string(),
+            body: AST::Block(vec![AST::Assign {
+                name: "b".to_string(),
+                value: AST::Number(1).into(),
+            }])
+            .into(),
+            parameters: vec![String::from("a"), String::from("b")],
+        };
+
+        println!("{}", expected_ast);
+        assert_eq!(
+            expected_ast,
+            lang_parser::statement(
+                r#"function myFunc(a, b) {
                 b = 1;
             }"#
             )
