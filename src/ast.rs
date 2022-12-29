@@ -1,4 +1,5 @@
-use std::fmt;
+use std::io::Write;
+use std::{fmt, writeln};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum AST {
@@ -61,6 +62,17 @@ pub enum AST {
         conditional: Box<AST>,
         body: Box<AST>,
     },
+
+    Main(Vec<AST>),
+    Assert(Box<AST>),
+}
+
+pub trait Emit {
+    fn emit(&self);
+    fn write(&self, ast: &AST, writter: &mut dyn Write) -> std::io::Result<()>;
+    fn emit_number(&self, number: &u64, writter: &mut dyn Write) -> std::io::Result<()>;
+    fn emit_assert(&self, condition: &AST, writter: &mut dyn Write) -> std::io::Result<()>;
+    fn emit_main(&self, statements: &Vec<AST>, writter: &mut dyn Write) -> std::io::Result<()>;
 }
 
 impl fmt::Display for AST {
@@ -113,6 +125,12 @@ impl fmt::Display for AST {
             AST::Assign { name, value } => write!(f, "{} = {}", name, value),
             AST::While { conditional, body } => {
                 write!(f, "while ({})\n{}", conditional, body)
+            }
+            AST::Main(statements) => {
+                write!(f, "{:?}", statements)
+            }
+            AST::Assert(condition) => {
+                write!(f, "{:?}", condition)
             }
         }
     }

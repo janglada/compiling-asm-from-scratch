@@ -1,7 +1,9 @@
 use crate::ast::AST;
+use peg::error::ParseError;
+use peg::str::LineCol;
 
 peg::parser! {
-  grammar lang_parser() for str {
+  pub grammar lang_parser() for str {
 
     rule _ = [' ' | '\n']*
 
@@ -19,11 +21,17 @@ peg::parser! {
     ///
     ///
     pub rule call() -> AST
-      = n:Id() _ "(" _ a:args() _ ")" {
-      AST::Call {
-        callee: n.to_string(),
-        args:a.to_vec()
-      }
+      = callee:Id() _ "(" _ a:args() _ ")" {
+            if callee.to_string() == "assert" {
+                let mut iter = a.into_iter().take(1);
+                let ast: AST = iter.next().unwrap();
+                AST::Assert(Box::new(ast))
+            } else {
+              AST::Call {
+                callee: callee.to_string(),
+                args:a.to_vec()
+              }
+            }
     }
    ///
    /// INFIX
@@ -144,16 +152,26 @@ peg::parser! {
 
    pub rule functionStmt() -> AST
             =  FUNCTION() _ id: Id() _ "(" _ p: parameters() _ ")" _ body:blockStmt() {
-               if let AST::Id(name) = id {
+            if let AST::Id(name) = id {
 
-                AST::Function {
-                    name,
-                    parameters: p,
-                    body: body.into()
-                }
+                if name == "main" {
+                  if let AST::Block(statements) = body {
+                    AST::Main(statements)
+                  } else {
+                        unreachable!()
+                   }
                 } else {
-                     unreachable!()
+
+                    AST::Function {
+                        name,
+                        parameters: p,
+                        body: body.into()
+                    }
                 }
+
+            } else {
+                 unreachable!()
+            }
     }
 
    pub rule statement() -> AST
@@ -180,6 +198,10 @@ peg::parser! {
 
 
   }
+}
+
+pub fn parse(input: &str) -> Result<AST, ParseError<LineCol>> {
+    lang_parser::statement(input)
 }
 
 #[cfg(test)]
@@ -580,6 +602,38 @@ mod tests {
     }
     return result; 
 }"#
+            )
+            .expect("Parser failed")
+        );
+    }
+
+    #[test]
+    fn main_stmt() {
+        let expected_ast = AST::Main(vec![
+            AST::Assign {
+                name: "b".to_string(),
+                value: AST::Number(1).into(),
+            },
+            AST::While {
+                conditional: AST::Id("a".into()).into(),
+                body: AST::Block(vec![AST::Assign {
+                    name: "b".to_string(),
+                    value: AST::Number(1).into(),
+                }])
+                .into(),
+            },
+        ]);
+
+        println!("{}", expected_ast);
+        assert_eq!(
+            expected_ast,
+            lang_parser::statement(
+                r#"function main() {
+                b = 1;
+                while (a) {
+                    b = 1;
+                }
+            }"#
             )
             .expect("Parser failed")
         );
