@@ -36,7 +36,7 @@ peg::parser! {
    ///
    /// INFIX
    rule sum() -> AST
-        = l:product() _ op:$("+" / "-") _ r:product() {
+        = _ l:product() _ op:$("+" / "-") _ r:product()  _ {
 
             match op {
                 "+" =>  AST::Add{left:l.into(), right:r.into()},
@@ -46,7 +46,7 @@ peg::parser! {
         } / product()
 
     rule product() -> AST
-        = l:comparison() _ op:$("*" / "/") _ r:comparison() {
+        = _ l:comparison() _ op:$("*" / "/") _ r:comparison() _ {
 
             match op {
                 "*" =>  AST::Multiply{left:l.into(), right:r.into()},
@@ -59,7 +59,7 @@ peg::parser! {
 
 
         rule comparison() -> AST
-            = l:atom() _ op:$("==" / "!=") _ r:atom() {
+            = _ l:atom() _ op:$("==" / "!=") _ r:atom() _ {
 
                 match op {
                     "==" =>  AST::Equal{left: l.into(), right: r.into()},
@@ -77,7 +77,7 @@ peg::parser! {
       }
     }
     rule atom() -> AST
-      = call() / Id() / Number() / "("  e:sum() ")" { e }
+      = call() / Id() / Number() / "(" _  e:sum() _ ")" { e }
 
     pub rule expression() -> AST
             = sum()
@@ -281,6 +281,44 @@ mod tests {
         assert_eq!(
             expected_ast,
             lang_parser::expression("(1+3) * 2").expect("Parser failed")
+        );
+    }
+
+    #[test]
+    fn infix() {
+        let expected_ast = AST::Equal {
+            right: AST::Add {
+                left: AST::Number(4).into(),
+                right: AST::Add {
+                    left: AST::Multiply {
+                        left: AST::Number(2).into(),
+                        right: AST::Subtract {
+                            left: AST::Number(12).into(),
+                            right: AST::Number(2).into(),
+                        }
+                        .into(),
+                    }
+                    .into(),
+                    right: AST::Multiply {
+                        left: AST::Number(3).into(),
+                        right: AST::Add {
+                            left: AST::Number(5).into(),
+                            right: AST::Number(1).into(),
+                        }
+                        .into(),
+                    }
+                    .into(),
+                }
+                .into(),
+            }
+            .into(),
+            left: AST::Number(42).into(),
+        };
+        println!("{}", expected_ast);
+
+        assert_eq!(
+            expected_ast,
+            lang_parser::expression("42 == 4 + 2 * (12 - 2) + 3 * (5 + 1)").expect("Parser failed")
         );
     }
 
