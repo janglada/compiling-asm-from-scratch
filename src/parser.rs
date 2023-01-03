@@ -35,7 +35,7 @@ peg::parser! {
     }
    ///
    /// INFIX
-   rule sum() -> AST
+   pub rule sum() -> AST
         = _ l:product() _ op:$("+" / "-") _ r:product()  _ {
 
             match op {
@@ -45,7 +45,7 @@ peg::parser! {
             }
         } / product()
 
-    rule product() -> AST
+   pub rule product() -> AST
         = _ l:comparison() _ op:$("*" / "/") _ r:comparison() _ {
 
             match op {
@@ -58,8 +58,8 @@ peg::parser! {
         / comparison()
 
 
-        rule comparison() -> AST
-            = _ l:atom() _ op:$("==" / "!=") _ r:atom() _ {
+    pub  rule comparison() -> AST
+            = _ l:unary() _ op:$("==" / "!=") _ r:unary() _ {
 
                 match op {
                     "==" =>  AST::Equal{left: l.into(), right: r.into()},
@@ -69,15 +69,15 @@ peg::parser! {
 
             } / unary()
 
-    rule unary() -> AST
+    pub rule unary() -> AST
       = n:("!")? a:atom() {
         match n {
           Some(term) => AST::Not(a.into()),
           None => a
       }
     }
-    rule atom() -> AST
-      = call() / Id() / Number() / "(" _  e:sum() _ ")" { e }
+    pub rule atom() -> AST
+      = call() / Id() / Number() /  "(" _  e:sum() _ ")"  { e }
 
     pub rule expression() -> AST
             = sum()
@@ -85,7 +85,7 @@ peg::parser! {
     ///
     /// Statements
     ///
-    rule returnStmt() -> AST
+    pub rule returnStmt() -> AST
             = RETURN()  _ e:expression() _ ";" {
             AST::Return {
                 term: e.into()
@@ -124,7 +124,7 @@ peg::parser! {
                 unreachable!()
             }
         }
-   rule assignmentStmt() -> AST
+   pub rule assignmentStmt() -> AST
             =  id:Id() _ ASSIGN() _ value:expression() _ ";" _ {
               if let AST::Id(name) = id {
                 AST::Assign {
@@ -135,11 +135,11 @@ peg::parser! {
                 unreachable!()
             }
         }
-   rule blockStmt() -> AST
+   pub rule blockStmt() -> AST
             =  "{" _  statements:statement()* _ "}"{
             AST::Block(statements.to_vec())
         }
-    rule parameters() -> Vec<String>
+    pub rule parameters() -> Vec<String>
       = ids:Id() ** (_ "," _) {
             ids.iter().cloned().map(|item|  {
                  if let AST::Id(name) = item {
@@ -283,7 +283,19 @@ mod tests {
             lang_parser::expression("(1+3) * 2").expect("Parser failed")
         );
     }
-
+    #[test]
+    fn infix_sums() {
+        lang_parser::expression("1 + 2 +3 +4+5").expect("Parser failed");
+    }
+    #[test]
+    fn infix_products() {
+        lang_parser::expression("1 * 2 *3 *4*5").expect("Parser failed");
+    }
+    #[test]
+    fn infix_parse2() {
+        lang_parser::expression("4 + 2 * 10 + 3 * 6").expect("Parser failed");
+        // lang_parser::expression("42 == 4 + 2 * (12 - 2) + 3 * (5 + 1)").expect("Parser failed");
+    }
     #[test]
     fn infix() {
         let expected_ast = AST::Equal {
