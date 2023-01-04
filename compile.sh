@@ -1,2 +1,2 @@
 #!/bin/bash
-/usr/bin/arm-linux-gnueabihf-gcc -static hello.s -o hello && ./hello
+/usr/bin/arm-linux-gnueabihf-gcc -static test.s -o test.bin && ./test.bin

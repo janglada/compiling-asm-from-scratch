@@ -35,52 +35,67 @@ peg::parser! {
     }
    ///
    /// INFIX
-   pub rule sum() -> AST
-        = _ l:product() _ op:$("+" / "-") _ r:product()  _ {
-
-            match op {
-                "+" =>  AST::Add{left:l.into(), right:r.into()},
-                "-" =>  AST::Subtract{left:l.into(), right:r.into()},
-                 x => panic!("sum found op {}", x)
-            }
-        } / product()
-
-   pub rule product() -> AST
-        = _ l:comparison() _ op:$("*" / "/") _ r:comparison() _ {
-
-            match op {
-                "*" =>  AST::Multiply{left:l.into(), right:r.into()},
-                "/" =>  AST::Divide{left:l.into(), right:r.into()},
-                 x => panic!("product found op {}", x)
-            }
-
-        }
-        / comparison()
-
-
-    pub  rule comparison() -> AST
-            = _ l:unary() _ op:$("==" / "!=") _ r:unary() _ {
-
-                match op {
-                    "==" =>  AST::Equal{left: l.into(), right: r.into()},
-                    "!=" =>  AST::NotEqual{left:l.into(), right:r.into()},
-                x => panic!("comparison found op {}", x)
-                }
-
-            } / unary()
-
-    pub rule unary() -> AST
-      = n:("!")? a:atom() {
-        match n {
-          Some(term) => AST::Not(a.into()),
-          None => a
-      }
-    }
+   // pub rule sum() -> AST
+   //      = _ l:product() _ op:$("+" / "-") _ r:product()  _ {
+   //
+   //          match op {
+   //              "+" =>  AST::Add{left:l.into(), right:r.into()},
+   //              "-" =>  AST::Subtract{left:l.into(), right:r.into()},
+   //               x => panic!("sum found op {}", x)
+   //          }
+   //      } / product()
+   //
+   // pub rule product() -> AST
+   //      = _ l:comparison() _ op:$("*" / "/") _ r:comparison() _ {
+   //
+   //          match op {
+   //              "*" =>  AST::Multiply{left:l.into(), right:r.into()},
+   //              "/" =>  AST::Divide{left:l.into(), right:r.into()},
+   //               x => panic!("product found op {}", x)
+   //          }
+   //
+   //      }
+   //      / comparison()
+   //
+   //
+   //  pub  rule comparison() -> AST
+   //          = _ l:unary() _ op:$("==" / "!=") _ r:unary() _ {
+   //
+   //              match op {
+   //                  "==" =>  AST::Equal{left: l.into(), right: r.into()},
+   //                  "!=" =>  AST::NotEqual{left:l.into(), right:r.into()},
+   //              x => panic!("comparison found op {}", x)
+   //              }
+   //
+   //          } / unary()
+   //
+   //  pub rule unary() -> AST
+   //    = n:("!")? a:atom() {
+   //      match n {
+   //        Some(term) => AST::Not(a.into()),
+   //        None => a
+   //    }
+   //  }
     pub rule atom() -> AST
-      = call() / Id() / Number() /  "(" _  e:sum() _ ")"  { e }
+      = call() / Id() / Number()
 
-    pub rule expression() -> AST
-            = sum()
+    // pub rule expression2() -> AST
+    //         = sum()
+    pub rule expression() -> AST = precedence!{
+        x:(@) _ "==" _ y:@ { AST::Equal{left:x.into(), right:y.into()} }
+        x:(@) _ "!=" _ y:@ { AST::NotEqual{left:x.into(), right:y.into()} }
+        --
+        x:(@) _ "+" _ y:@ { AST::Add{left:x.into(), right:y.into()} }
+        x:(@) _ "-" _ y:@ { AST::Subtract{left:x.into(), right:y.into()} }
+        --
+        x:(@) _ "*" _ y:@ { AST::Multiply{left:x.into(), right:y.into()} }
+        x:(@) _ "/" _ y:@ { AST::Divide{left:x.into(), right:y.into()} }
+        --
+       "!" _ x:@ { AST::Not(x.into()) }
+        --
+        "(" _ v:expression() _ ")" { v }
+        n:atom() {n}
+    }
 
     ///
     /// Statements
@@ -235,10 +250,10 @@ mod tests {
     #[test]
     fn arithmetic1() {
         let expected_ast = AST::Add {
-            left: AST::Number(1).into(),
+            left: 1.into(),
             right: AST::Multiply {
-                left: AST::Number(3).into(),
-                right: AST::Number(2).into(),
+                left: 3.into(),
+                right: 2.into(),
             }
             .into(),
         };
@@ -252,10 +267,10 @@ mod tests {
     #[test]
     fn arithmetic_wvars() {
         let expected_ast = AST::Add {
-            left: AST::Id("a".to_string()).into(),
+            left: "a".to_string().into(),
             right: AST::Multiply {
-                left: AST::Id("b".to_string()).into(),
-                right: AST::Id("c".to_string()).into(),
+                left: "b".to_string().into(),
+                right: "c".to_string().into(),
             }
             .into(),
         };
@@ -270,11 +285,11 @@ mod tests {
     fn arithmetic2() {
         let expected_ast = AST::Multiply {
             left: AST::Add {
-                left: AST::Number(1).into(),
-                right: AST::Number(3).into(),
+                left: 1.into(),
+                right: 3.into(),
             }
             .into(),
-            right: AST::Number(2).into(),
+            right: 2.into(),
         };
         println!("{}", expected_ast);
 
@@ -300,22 +315,22 @@ mod tests {
     fn infix() {
         let expected_ast = AST::Equal {
             right: AST::Add {
-                left: AST::Number(4).into(),
+                left: 4.into(),
                 right: AST::Add {
                     left: AST::Multiply {
-                        left: AST::Number(2).into(),
+                        left: 2.into(),
                         right: AST::Subtract {
-                            left: AST::Number(12).into(),
-                            right: AST::Number(2).into(),
+                            left: 12.into(),
+                            right: 2.into(),
                         }
                         .into(),
                     }
                     .into(),
                     right: AST::Multiply {
-                        left: AST::Number(3).into(),
+                        left: 3.into(),
                         right: AST::Add {
-                            left: AST::Number(5).into(),
-                            right: AST::Number(1).into(),
+                            left: 5.into(),
+                            right: 1.into(),
                         }
                         .into(),
                     }
@@ -324,7 +339,7 @@ mod tests {
                 .into(),
             }
             .into(),
-            left: AST::Number(42).into(),
+            left: 42.into(),
         };
         println!("{}", expected_ast);
 
@@ -333,19 +348,40 @@ mod tests {
             lang_parser::expression("42 == 4 + 2 * (12 - 2) + 3 * (5 + 1)").expect("Parser failed")
         );
     }
-
     ///
     ///
     #[test]
     fn comparison() {
         let expected_ast = AST::NotEqual {
-            left: AST::Number(1).into(),
-            right: AST::Number(2).into(),
+            left: 1.into(),
+            right: 2.into(),
         };
         println!("{}", expected_ast);
         assert_eq!(
             expected_ast,
             lang_parser::expression("1 != 2").expect("Parser failed")
+        )
+    }
+    ///
+    ///
+    #[test]
+    fn comparison_expr() {
+        let expected_ast = AST::Equal {
+            left: AST::Add {
+                left: 1.into(),
+                right: 1.into(),
+            }
+            .into(),
+            right: AST::Subtract {
+                left: 2.into(),
+                right: 1.into(),
+            }
+            .into(),
+        };
+        println!("{}", expected_ast);
+        assert_eq!(
+            expected_ast,
+            lang_parser::expression("1 + 1 == 2 -1").expect("Parser failed")
         )
     }
 
@@ -406,12 +442,16 @@ mod tests {
                     right: AST::Number(1).into(),
                 },
                 AST::Id("a".to_string()),
+                AST::NotEqual {
+                    left: 1.into(),
+                    right: 0.into(),
+                },
             ],
         };
         println!("{}", expected_ast);
         assert_eq!(
             expected_ast,
-            lang_parser::expression("myFunction(1+1,a)").expect("Parser failed")
+            lang_parser::expression("myFunction(1+1,a, 1 != 0)").expect("Parser failed")
         );
     }
 
