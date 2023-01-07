@@ -108,7 +108,7 @@ peg::parser! {
         }
 
    pub rule exprStmt() -> AST
-            = e:expression() _ ";" { e }
+            = e:expression() _ ";" _  { e }
 
    pub  rule ifStmt() -> AST
             = "if"  _ "(" _ conditional: expression()  _ ")"  _ consequence: statement() _ ELSE()  _ alternative: statement() {
@@ -222,6 +222,7 @@ pub fn parse(input: &str) -> Result<AST, ParseError<LineCol>> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::ast::AST::Main;
 
     #[test]
     fn number() {
@@ -531,6 +532,27 @@ mod tests {
                 r#"{
                 var a = 1;
                 var b = 2;
+             }"#
+            )
+            .expect("Parser failed")
+        );
+    }
+
+    #[test]
+    fn block_stmt_within_main() {
+        let expected_ast = AST::Main(vec![AST::Block(vec![
+            AST::Assert(1.into()),
+            AST::Assert(1.into()),
+        ])]);
+        println!("{}", expected_ast);
+        assert_eq!(
+            expected_ast,
+            lang_parser::statement(
+                r#"function main() {
+                {
+                    assert(1);
+                    assert(1);
+                }
              }"#
             )
             .expect("Parser failed")
