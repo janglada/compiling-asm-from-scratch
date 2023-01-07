@@ -3,54 +3,65 @@ use std::io::Write;
 
 pub trait Emit {
     fn emit(&self);
-    fn write(&self, ast: &AST, writter: &mut dyn Write) -> std::io::Result<()>;
-    fn emit_not(&self, term: &Box<AST>, writer: &mut dyn Write) -> std::io::Result<()>;
-    fn emit_number(&self, number: &u64, writter: &mut dyn Write) -> std::io::Result<()>;
-    fn emit_assert(&self, condition: &AST, writter: &mut dyn Write) -> std::io::Result<()>;
-    fn emit_main(&self, statements: &Vec<AST>, writter: &mut dyn Write) -> std::io::Result<()>;
-    fn emit_block(&self, statements: &Vec<AST>, writter: &mut dyn Write) -> std::io::Result<()>;
+    fn write(&mut self, ast: &AST, writter: &mut dyn Write) -> std::io::Result<()>;
+    fn emit_not(&mut self, term: &Box<AST>, writer: &mut dyn Write) -> std::io::Result<()>;
+    fn emit_number(&mut self, number: &u64, writter: &mut dyn Write) -> std::io::Result<()>;
+    fn emit_assert(&mut self, condition: &AST, writter: &mut dyn Write) -> std::io::Result<()>;
+    fn emit_main(&mut self, statements: &Vec<AST>, writter: &mut dyn Write) -> std::io::Result<()>;
+    fn emit_block(&mut self, statements: &Vec<AST>, writter: &mut dyn Write)
+        -> std::io::Result<()>;
     fn emit_add(
-        &self,
+        &mut self,
         left: &Box<AST>,
         right: &Box<AST>,
         writer: &mut dyn Write,
     ) -> std::io::Result<()>;
-    fn emit_infix_operands(&self, left: &Box<AST>, right: &Box<AST>, writer: &mut dyn Write);
+    fn emit_infix_operands(&mut self, left: &Box<AST>, right: &Box<AST>, writer: &mut dyn Write);
     fn emit_subtract(
-        &self,
+        &mut self,
         left: &Box<AST>,
         right: &Box<AST>,
         writer: &mut dyn Write,
     ) -> std::io::Result<()>;
     fn emit_divide(
-        &self,
+        &mut self,
         left: &Box<AST>,
         right: &Box<AST>,
         writer: &mut dyn Write,
     ) -> std::io::Result<()>;
     fn emit_multiply(
-        &self,
+        &mut self,
         left: &Box<AST>,
         right: &Box<AST>,
         writer: &mut dyn Write,
     ) -> std::io::Result<()>;
     fn emit_equal(
-        &self,
+        &mut self,
         left: &Box<AST>,
         right: &Box<AST>,
         writer: &mut dyn Write,
     ) -> std::io::Result<()>;
     fn emit_not_equal(
-        &self,
+        &mut self,
         left: &Box<AST>,
         right: &Box<AST>,
         writer: &mut dyn Write,
     ) -> std::io::Result<()>;
 
     fn emit_call(
-        &self,
+        &mut self,
         args: &Vec<AST>,
         callee: &String,
         writer: &mut dyn Write,
     ) -> std::io::Result<()>;
+
+    fn emit_ifnode(
+        &mut self,
+        conditional: &Box<AST>,
+        consequence: &Box<AST>,
+        alternative: &Box<AST>,
+        writer: &mut dyn Write,
+    ) -> std::io::Result<()>;
+
+    fn new_label(&mut self) -> String;
 }
