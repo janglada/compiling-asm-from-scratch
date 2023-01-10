@@ -166,7 +166,7 @@ peg::parser! {
         }
 
    pub rule functionStmt() -> AST
-            =  FUNCTION() _ id: Id() _ "(" _ p: parameters() _ ")" _ body:blockStmt() {
+            =  FUNCTION() _ id: Id() _ "(" _ p: parameters() _ ")" _ body:blockStmt() _ {
             if let AST::Id(name) = id {
 
                 if name == "main" {

@@ -1,5 +1,6 @@
 use crate::ast::AST;
-use crate::emitter::Emit;
+use crate::emitter::{Emit, Environment};
+use std::collections::HashMap;
 use std::io::Write;
 
 struct ArmCode {
@@ -12,6 +13,22 @@ impl Default for ArmCode {
     }
 }
 
+impl ArmCode {
+    fn emit_fn_prologue(&mut self, writer: &mut dyn Write) -> std::io::Result<()> {
+        writeln!(writer, "\tpush {{fp, lr}}")?;
+        writeln!(writer, "\tmov fp, sp")?;
+        writeln!(writer, "\tpush {{r0, r1, r2, r3}}")
+    }
+    fn emit_fn_epilogue(&mut self, writer: &mut dyn Write) -> std::io::Result<()> {
+        writeln!(writer, "\tmov sp, fp")?;
+        // .We set r0 and thus our return value to 0.
+        // This is to mimic the fact that JavaScript functions return undefined
+        // when there’s no explicit return
+        writeln!(writer, "\tmov r0, #0")?;
+        writeln!(writer, "\tpop {{ fp, pc }}")
+    }
+}
+
 impl Emit for ArmCode {
     fn emit(&self) {
         todo!()
@@ -21,25 +38,35 @@ impl Emit for ArmCode {
         return format!(".L{}", self.label_counter);
     }
 
-    fn write(&mut self, ast: &AST, writer: &mut dyn Write) -> std::io::Result<()> {
+    fn write(
+        &mut self,
+        ast: &AST,
+        env: Option<&Environment>,
+        writer: &mut dyn Write,
+    ) -> std::io::Result<()> {
         match ast {
-            AST::Main(statements) => self.emit_main(statements, writer),
-            AST::Assert(condition) => self.emit_assert(condition, writer),
-            AST::Number(number) => self.emit_number(number, writer),
-            AST::Not(term) => self.emit_not(term, writer),
-            AST::Add { left, right } => self.emit_add(left, right, writer),
-            AST::Subtract { left, right } => self.emit_subtract(left, right, writer),
-            AST::Multiply { left, right } => self.emit_multiply(left, right, writer),
-            AST::Divide { left, right } => self.emit_divide(left, right, writer),
-            AST::Equal { left, right } => self.emit_equal(left, right, writer),
-            AST::NotEqual { left, right } => self.emit_not_equal(left, right, writer),
-            AST::Block(statements) => self.emit_block(statements, writer),
-            AST::Call { args, callee } => self.emit_call(args, callee, writer),
+            AST::Main(statements) => self.emit_main(statements, env, writer),
+            AST::Assert(condition) => self.emit_assert(condition, env, writer),
+            AST::Number(number) => self.emit_number(number, env, writer),
+            AST::Not(term) => self.emit_not(term, env, writer),
+            AST::Add { left, right } => self.emit_add(left, right, env, writer),
+            AST::Subtract { left, right } => self.emit_subtract(left, right, env, writer),
+            AST::Multiply { left, right } => self.emit_multiply(left, right, env, writer),
+            AST::Divide { left, right } => self.emit_divide(left, right, env, writer),
+            AST::Equal { left, right } => self.emit_equal(left, right, env, writer),
+            AST::NotEqual { left, right } => self.emit_not_equal(left, right, env, writer),
+            AST::Block(statements) => self.emit_block(statements, env, writer),
+            AST::Call { args, callee } => self.emit_call(args, callee, env, writer),
+            AST::Function {
+                name,
+                parameters,
+                body,
+            } => self.emit_function(name, parameters, body, env, writer),
             AST::IfNode {
                 conditional,
                 consequence,
                 alternative,
-            } => self.emit_ifnode(conditional, consequence, alternative, writer),
+            } => self.emit_ifnode(conditional, consequence, alternative, env, writer),
             // AST::Id(_) => {}
 
             // AST::Return { .. } => {}
@@ -64,9 +91,10 @@ impl Emit for ArmCode {
         &mut self,
         left: &Box<AST>,
         right: &Box<AST>,
+        env: Option<&Environment>,
         writer: &mut dyn Write,
     ) -> std::io::Result<()> {
-        self.emit_infix_operands(left, right, writer);
+        self.emit_infix_operands(left, right, env, writer);
         write!(writer, "\t")?;
         writeln!(writer, "add r0, r0, r1")
     }
@@ -75,9 +103,10 @@ impl Emit for ArmCode {
         &mut self,
         left: &Box<AST>,
         right: &Box<AST>,
+        env: Option<&Environment>,
         writer: &mut dyn Write,
     ) -> std::io::Result<()> {
-        self.emit_infix_operands(left, right, writer);
+        self.emit_infix_operands(left, right, env, writer);
         write!(writer, "\t")?;
         writeln!(writer, "sub r0, r0, r1")
     }
@@ -85,9 +114,10 @@ impl Emit for ArmCode {
         &mut self,
         left: &Box<AST>,
         right: &Box<AST>,
+        env: Option<&Environment>,
         writer: &mut dyn Write,
     ) -> std::io::Result<()> {
-        self.emit_infix_operands(left, right, writer);
+        self.emit_infix_operands(left, right, env, writer);
         write!(writer, "\t")?;
         writeln!(writer, "mul r0, r0, r1")
     }
@@ -95,9 +125,10 @@ impl Emit for ArmCode {
         &mut self,
         left: &Box<AST>,
         right: &Box<AST>,
+        env: Option<&Environment>,
         writer: &mut dyn Write,
     ) -> std::io::Result<()> {
-        self.emit_infix_operands(left, right, writer);
+        self.emit_infix_operands(left, right, env, writer);
         write!(writer, "\t")?;
         writeln!(writer, "udiv r0, r0, r1")
     }
@@ -105,9 +136,10 @@ impl Emit for ArmCode {
         &mut self,
         left: &Box<AST>,
         right: &Box<AST>,
+        env: Option<&Environment>,
         writer: &mut dyn Write,
     ) -> std::io::Result<()> {
-        self.emit_infix_operands(left, right, writer);
+        self.emit_infix_operands(left, right, env, writer);
         writeln!(
             writer,
             r#"
@@ -121,9 +153,10 @@ impl Emit for ArmCode {
         &mut self,
         left: &Box<AST>,
         right: &Box<AST>,
+        env: Option<&Environment>,
         writer: &mut dyn Write,
     ) -> std::io::Result<()> {
-        self.emit_infix_operands(left, right, writer);
+        self.emit_infix_operands(left, right, env, writer);
         writeln!(
             writer,
             r#"
@@ -133,15 +166,26 @@ impl Emit for ArmCode {
         "#
         )
     }
-    fn emit_infix_operands(&mut self, left: &Box<AST>, right: &Box<AST>, writer: &mut dyn Write) {
-        self.write(left, writer).unwrap();
+    fn emit_infix_operands(
+        &mut self,
+        left: &Box<AST>,
+        right: &Box<AST>,
+        env: Option<&Environment>,
+        writer: &mut dyn Write,
+    ) {
+        self.write(left, env, writer).unwrap();
         writeln!(writer, "\tpush {{r0, ip}}").unwrap();
-        self.write(right, writer).unwrap();
+        self.write(right, env, writer).unwrap();
         writeln!(writer, "\tpop {{r1, ip}}").unwrap();
     }
 
-    fn emit_not(&mut self, term: &Box<AST>, writer: &mut dyn Write) -> std::io::Result<()> {
-        self.write(term, writer)?;
+    fn emit_not(
+        &mut self,
+        term: &Box<AST>,
+        env: Option<&Environment>,
+        writer: &mut dyn Write,
+    ) -> std::io::Result<()> {
+        self.write(term, env, writer)?;
         writeln!(
             writer,
             r#"
@@ -152,14 +196,24 @@ impl Emit for ArmCode {
         )
     }
 
-    fn emit_number(&mut self, number: &u64, writer: &mut dyn Write) -> std::io::Result<()> {
+    fn emit_number(
+        &mut self,
+        number: &u64,
+        env: Option<&Environment>,
+        writer: &mut dyn Write,
+    ) -> std::io::Result<()> {
         writeln!(writer, "\tldr r0, ={}", number)
     }
 
     ///
     ///
-    fn emit_assert(&mut self, condition: &AST, writer: &mut dyn Write) -> std::io::Result<()> {
-        self.write(condition, writer)?;
+    fn emit_assert(
+        &mut self,
+        condition: &AST,
+        env: Option<&Environment>,
+        writer: &mut dyn Write,
+    ) -> std::io::Result<()> {
+        self.write(condition, env, writer)?;
         writeln!(
             writer,
             r#"
@@ -177,20 +231,30 @@ impl Emit for ArmCode {
     ///
     ///
     ///
-    fn emit_main(&mut self, statements: &Vec<AST>, writer: &mut dyn Write) -> std::io::Result<()> {
+    fn emit_main(
+        &mut self,
+        statements: &Vec<AST>,
+        env: Option<&Environment>,
+        writer: &mut dyn Write,
+    ) -> std::io::Result<()> {
         writeln!(writer, ".global main")?;
         writeln!(writer, "main:")?;
         writeln!(writer, "\tpush {{fp, lr}}")?;
         for statement in statements {
-            self.write(statement, writer)?;
+            self.write(statement, env, writer)?;
         }
         writeln!(writer, "\tmov r0, #0")?;
         writeln!(writer, "\tpop {{fp, pc}}")
     }
 
-    fn emit_block(&mut self, statements: &Vec<AST>, writer: &mut dyn Write) -> std::io::Result<()> {
+    fn emit_block(
+        &mut self,
+        statements: &Vec<AST>,
+        env: Option<&Environment>,
+        writer: &mut dyn Write,
+    ) -> std::io::Result<()> {
         for statement in statements {
-            self.write(statement, writer)?;
+            self.write(statement, env, writer)?;
         }
         Ok(())
     }
@@ -199,13 +263,14 @@ impl Emit for ArmCode {
         &mut self,
         args: &Vec<AST>,
         callee: &String,
+        env: Option<&Environment>,
         writer: &mut dyn Write,
     ) -> std::io::Result<()> {
         let len = args.len();
         if args.is_empty() {
             writeln!(writer, "\tbl {}", callee)
         } else if len == 1 {
-            self.write(args.get(0).unwrap(), writer);
+            self.write(args.get(0).unwrap(), env, writer);
             writeln!(writer, "\tbl {}", callee)
         } else if len >= 2 && len <= 4 {
             // allocate enough stack space for up to four arguments (16 bytes)
@@ -214,7 +279,7 @@ impl Emit for ArmCode {
             // lower.
             writeln!(writer, "\tsub sp, sp, #16")?;
             args.iter().enumerate().for_each(|(i, arg)| {
-                self.write(arg, writer).expect("Write failed");
+                self.write(arg, env, writer).expect("Write failed");
                 // We multiply by four to convert array indexes 0, 1, 2, 3 into
                 // stack offsets in bytes: 0, 4, 8, 12.
                 writeln!(writer, "\tstr r0, [sp, #{}]", 4 * i).expect("Write failed");
@@ -231,18 +296,57 @@ impl Emit for ArmCode {
         conditional: &Box<AST>,
         consequence: &Box<AST>,
         alternative: &Box<AST>,
+        env: Option<&Environment>,
         writer: &mut dyn Write,
     ) -> std::io::Result<()> {
         let if_false_label = self.new_label();
         let end_if_label = self.new_label();
-        self.write(conditional, writer)?;
+        self.write(conditional, env, writer)?;
         writeln!(writer, "\tcmp r0, #0")?;
         writeln!(writer, "\tbeq {}", if_false_label)?;
-        self.write(consequence, writer)?;
+        self.write(consequence, env, writer)?;
         writeln!(writer, "\tb {}", end_if_label)?;
         writeln!(writer, "{}:", if_false_label)?;
-        self.write(alternative, writer)?;
+        self.write(alternative, env, writer)?;
         writeln!(writer, "{}:", end_if_label)
+    }
+
+    fn emit_function(
+        &mut self,
+        name: &String,
+        parameters: &Vec<String>,
+        body: &Box<AST>,
+        _: Option<&Environment>,
+        writer: &mut dyn Write,
+    ) -> std::io::Result<()> {
+        if parameters.len() > 4 {
+            panic!("More than 4 params is not supported");
+        }
+        writeln!(writer, "")?;
+        writeln!(writer, ".global {}", name)?;
+        writeln!(writer, "{}:", name)?;
+        self.emit_fn_prologue(writer)?;
+        let mut locals: HashMap<String, isize> = HashMap::new();
+        for (i, parameter) in parameters.iter().enumerate() {
+            locals.insert(parameter.clone(), 4 * i as isize - 16);
+        }
+        let env = Environment { locals: locals };
+        self.write(body, Some(&env), writer)?;
+        self.emit_fn_epilogue(writer)
+    }
+
+    fn emit_idnode(
+        &mut self,
+        name: &String,
+        env: Option<&Environment>,
+        writer: &mut dyn Write,
+    ) -> std::io::Result<()> {
+        let offset = env
+            .expect("Missing enviroment")
+            .locals
+            .get(name)
+            .expect(format!("Undefined variable: {}", name).as_str());
+        writeln!(writer, "\t ldr r0, [fp, #{}]", offset)
     }
 }
 #[cfg(test)]
@@ -253,7 +357,7 @@ mod tests {
     use std::process::{Command, Stdio};
     use std::{env, io};
 
-    fn compile_and_run(code: &str) {
+    fn compile_and_run(code: &str) -> Result<()> {
         let ast = parse(code).expect("Failed");
 
         let mut arm_code = ArmCode {
@@ -261,31 +365,36 @@ mod tests {
         };
         //arm_code.write(&ast, &mut io::stdout());
 
-        let mut buffer = File::create("test.s").expect("Open file failed");
-        arm_code.write(&ast, &mut buffer);
+        arm_code.write(
+            &ast,
+            Option::None,
+            &mut File::create("test.s").expect("Open file failed"),
+        );
 
-        let mut output = Command::new("bash")
-            .arg("-c")
-            // .env("PATH", "/usr/bin")
-            .arg("ls -al /usr/bin/ar*")
-            // .arg("whoami")
-            // .arg("-static")
-            // .arg("hello.s")
-            // .arg("-o")
-            // .arg("hello")
-            // .args(["-static", "hello.s", "-o", "hello"])
+        // arm-linux-gnueabihf-gcc -static test.s
+
+        let mut output = Command::new("arm-linux-gnueabihf-gcc")
+            .arg("-static")
+            .arg("test.s")
+            .arg("-o")
+            .arg("test.bin")
             .output()
             .expect("failed to execute process");
-
-        // let output = Command::new("ls")
-        //     .output()
-        //     .expect("ls command failed to start");
 
         println!("status: {}", output.status);
         io::stdout().write_all(&output.stdout).unwrap();
         io::stderr().write_all(&output.stderr).unwrap();
 
         assert!(output.status.success());
+
+        output = Command::new("./test.bin")
+            .output()
+            .expect("failed to execute process");
+
+        // io::stdout().write_all(&output.stdout).unwrap();
+        io::stderr().write_all(&output.stderr).unwrap();
+
+        assert!(output.status.success())
     }
 
     #[test]
@@ -374,6 +483,24 @@ mod tests {
                     } else {
                         assert(1);
                     }
+                }
+            }"#,
+        )
+    }
+    #[test]
+    fn compile_function() {
+        compile_and_run(
+            r#"function main() {
+                { 
+                    function asserttt(a, b, c, d) {
+                        assert(a == 1);
+                        assert(b == 2);
+                        assert(c == 3);
+                        assert(d == 4);
+                    }
+                    
+                    asserttt(1, 2, 5, 4, 5);
+                    
                 }
             }"#,
         )
