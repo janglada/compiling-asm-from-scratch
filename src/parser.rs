@@ -1,4 +1,5 @@
 use crate::ast::AST;
+use crate::error::CompileError;
 use peg::error::ParseError;
 use peg::str::LineCol;
 
@@ -215,8 +216,8 @@ peg::parser! {
   }
 }
 
-pub fn parse(input: &str) -> Result<AST, ParseError<LineCol>> {
-    lang_parser::statement(input)
+pub fn parse(input: &str) -> Result<AST, CompileError> {
+    lang_parser::statement(input).map_err(|e| CompileError::ParseError(e))
 }
 
 #[cfg(test)]

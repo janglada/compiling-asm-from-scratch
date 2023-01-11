@@ -126,6 +126,12 @@ pub trait Emit {
         env: Option<&Environment>,
         writer: &mut dyn Write,
     ) -> std::io::Result<()>;
+    fn emit_return(
+        &mut self,
+        term: &Box<AST>,
+        env: Option<&Environment>,
+        writer: &mut dyn Write,
+    ) -> std::io::Result<()>;
 
     fn new_label(&mut self) -> String;
 }

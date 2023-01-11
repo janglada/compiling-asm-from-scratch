@@ -67,7 +67,8 @@ impl Emit for ArmCode {
                 consequence,
                 alternative,
             } => self.emit_ifnode(conditional, consequence, alternative, env, writer),
-            // AST::Id(_) => {}
+            AST::Return { term } => self.emit_return(term, env, writer),
+            AST::Id(name) => self.emit_idnode(name, env, writer),
 
             // AST::Return { .. } => {}
 
@@ -342,59 +343,89 @@ impl Emit for ArmCode {
         writer: &mut dyn Write,
     ) -> std::io::Result<()> {
         let offset = env
-            .expect("Missing enviroment")
+            .expect("Missing environment")
             .locals
             .get(name)
             .expect(format!("Undefined variable: {}", name).as_str());
         writeln!(writer, "\t ldr r0, [fp, #{}]", offset)
     }
+
+    fn emit_return(
+        &mut self,
+        term: &Box<AST>,
+        env: Option<&Environment>,
+        writer: &mut dyn Write,
+    ) -> std::io::Result<()> {
+        self.write(term, env, writer)?;
+        writeln!(writer, "\tmov sp, fp")?;
+        writeln!(writer, "\tpop {{fp, pc}}")
+    }
 }
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::error::{CodeGenError, CompileError};
     use crate::parser::parse;
     use std::fs::File;
     use std::process::{Command, Stdio};
     use std::{env, io};
 
-    fn compile_and_run(code: &str) -> Result<()> {
-        let ast = parse(code).expect("Failed");
-
+    fn compile_and_run(code: &str) -> Result<(), CompileError> {
         let mut arm_code = ArmCode {
             ..Default::default()
         };
-        //arm_code.write(&ast, &mut io::stdout());
 
-        arm_code.write(
-            &ast,
-            Option::None,
-            &mut File::create("test.s").expect("Open file failed"),
-        );
+        let ast = parse(code).expect("Parse error");
+
+        arm_code
+            .write(
+                &ast,
+                Option::None,
+                &mut File::create("test.s").expect("Open file failed"),
+            )
+            .map_err(|e| CompileError::IOError(e))
+            .expect("Could not generate assembly");
+
+        //arm_code.write(&ast, &mut io::stdout());
 
         // arm-linux-gnueabihf-gcc -static test.s
 
-        let mut output = Command::new("arm-linux-gnueabihf-gcc")
+        let mut compile_result = Command::new("arm-linux-gnueabihf-gcc")
             .arg("-static")
             .arg("test.s")
             .arg("-o")
             .arg("test.bin")
-            .output()
-            .expect("failed to execute process");
+            .output();
 
-        println!("status: {}", output.status);
-        io::stdout().write_all(&output.stdout).unwrap();
-        io::stderr().write_all(&output.stderr).unwrap();
+        let codegen_result: Result<(), CompileError> = match compile_result {
+            Ok(output) => {
+                io::stdout().write_all(&output.stdout).unwrap();
+                io::stderr().write_all(&output.stderr).unwrap();
 
-        assert!(output.status.success());
+                if output.status.success() {
+                    Ok(())
+                } else {
+                    return Err(CompileError::CodeGenError(format!("{:?}", &output.stderr)));
+                }
+            }
+            Err(e) => return Err(CompileError::CodeGenError(e.to_string())),
+        };
 
-        output = Command::new("./test.bin")
-            .output()
-            .expect("failed to execute process");
+        let execution_res = match Command::new("./test.bin").output() {
+            Ok(output) => {
+                io::stdout().write_all(&output.stdout).unwrap();
+                io::stderr().write_all(&output.stderr).unwrap();
 
-        // io::stdout().write_all(&output.stdout).unwrap();
-        io::stderr().write_all(&output.stderr).unwrap();
+                if output.status.success() {
+                    Ok(())
+                } else {
+                    return Err(CompileError::RuntimeError(format!("{:?}", &output.stderr)));
+                }
+            }
+            Err(e) => return Err(CompileError::RuntimeError(e.to_string())),
+        };
 
-        assert!(output.status.success())
+        execution_res
     }
 
     #[test]
@@ -410,7 +441,7 @@ mod tests {
     }
 
     #[test]
-    fn compile_assert() {
+    fn compile_assert() -> Result<(), CompileError> {
         compile_and_run(
             r#"function main() {
                 assert(0);
@@ -418,7 +449,7 @@ mod tests {
         )
     }
     #[test]
-    fn compile_not() {
+    fn compile_not() -> Result<(), CompileError> {
         compile_and_run(
             r#"function main() {
                 assert(!1);
@@ -427,7 +458,7 @@ mod tests {
     }
 
     #[test]
-    fn compile_infix() {
+    fn compile_infix() -> Result<(), CompileError> {
         compile_and_run(
             r#"function main() {
                 assert(42 == 4 + 2 * (12 - 2) + 3 * (5 + 1));
@@ -435,7 +466,7 @@ mod tests {
         )
     }
     #[test]
-    fn compile_block() {
+    fn compile_block() -> Result<(), CompileError> {
         compile_and_run(
             r#"function main() {
                 { 
@@ -446,7 +477,7 @@ mod tests {
         )
     }
     #[test]
-    fn compile_call() {
+    fn compile_call() -> Result<(), CompileError> {
         compile_and_run(
             r#"function main() {
                 { 
@@ -460,7 +491,7 @@ mod tests {
     }
 
     #[test]
-    fn compile_if_1() {
+    fn compile_if_1() -> Result<(), CompileError> {
         compile_and_run(
             r#"function main() {
                 { 
@@ -474,7 +505,7 @@ mod tests {
         )
     }
     #[test]
-    fn compile_if_2() {
+    fn compile_if_2() -> Result<(), CompileError> {
         compile_and_run(
             r#"function main() {
                 { 
@@ -488,7 +519,7 @@ mod tests {
         )
     }
     #[test]
-    fn compile_function() {
+    fn compile_function() -> Result<(), CompileError> {
         compile_and_run(
             r#"function main() {
                 { 
@@ -500,6 +531,25 @@ mod tests {
                     }
                     
                     asserttt(1, 2, 5, 4, 5);
+                    
+                }
+            }"#,
+        )
+    }
+    #[test]
+    fn factorial() -> Result<(), CompileError> {
+        compile_and_run(
+            r#"function main() {
+                { 
+                    function factorial(n) {
+                        if (n == 0) {
+                            return 1;
+                        } else {
+                            return n * factorial(n - 1);
+                        }
+                    }
+                    
+                   assert(factorial(5) == 120);
                     
                 }
             }"#,
