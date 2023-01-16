@@ -112,7 +112,7 @@ peg::parser! {
             = e:expression() _ ";" _  { e }
 
    pub  rule ifStmt() -> AST
-            = "if"  _ "(" _ conditional: expression()  _ ")"  _ consequence: statement() _ ELSE()  _ alternative: statement() {
+            = "if"  _ "(" _ conditional: expression()  _ ")"  _ consequence: statement() _ ELSE()  _ alternative: statement() _ {
             AST::IfNode {
                 conditional: conditional.into(),
                 consequence: consequence.into(),
@@ -152,7 +152,7 @@ peg::parser! {
             }
         }
    pub rule blockStmt() -> AST
-            =  "{" _  statements:statement()* _ "}"{
+            =  "{" _  statements:statement()* _ "}" {
             AST::Block(statements.to_vec())
         }
     pub rule parameters() -> Vec<String>
@@ -193,6 +193,19 @@ peg::parser! {
    pub rule statement() -> AST
         = returnStmt() / ifStmt() / whileStmt() / varStmt() / assignmentStmt() / blockStmt() / functionStmt() / exprStmt()
 
+   pub rule parser() -> AST
+        = _ s:statement() ** _ {
+            if s.len() == 1 {
+
+                    return s.get(0).unwrap().clone();
+
+            }
+                AST::Block(s)
+
+
+        }
+
+
     ///
     /// keywords
     ///
@@ -217,13 +230,13 @@ peg::parser! {
 }
 
 pub fn parse(input: &str) -> Result<AST, CompileError> {
-    lang_parser::statement(input).map_err(|e| CompileError::ParseError(e))
+    lang_parser::parser(input).map_err(|e| CompileError::ParseError(e))
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::ast::AST::Main;
+    use crate::ast::AST::{Block, Main};
 
     #[test]
     fn number() {
@@ -466,11 +479,11 @@ mod tests {
         println!("{}", expected_ast);
         assert_eq!(
             expected_ast,
-            lang_parser::statement("var a = 1;").expect("Parser failed")
+            lang_parser::parser("var a = 1;").expect("Parser failed")
         );
         assert_eq!(
             expected_ast,
-            lang_parser::statement("var a=1;").expect("Parser failed")
+            lang_parser::parser("var a=1;").expect("Parser failed")
         );
     }
 
@@ -483,11 +496,11 @@ mod tests {
         println!("{}", expected_ast);
         assert_eq!(
             expected_ast,
-            lang_parser::statement("a = 1;").expect("Parser failed")
+            lang_parser::parser("a = 1;").expect("Parser failed")
         );
         assert_eq!(
             expected_ast,
-            lang_parser::statement("a=1;").expect("Parser failed")
+            lang_parser::parser("a=1;").expect("Parser failed")
         );
     }
 
@@ -503,7 +516,7 @@ mod tests {
         println!("{}", expected_ast);
         assert_eq!(
             expected_ast,
-            lang_parser::statement("return 1 + 1;").expect("Parser failed")
+            lang_parser::parser("return 1 + 1;").expect("Parser failed")
         );
         let expected_ast = AST::Return {
             term: AST::Id("a".to_string()).into(),
@@ -511,7 +524,7 @@ mod tests {
         println!("{}", expected_ast);
         assert_eq!(
             expected_ast,
-            lang_parser::statement("return   a;").expect("Parser failed")
+            lang_parser::parser("return   a;").expect("Parser failed")
         );
     }
     #[test]
@@ -529,7 +542,7 @@ mod tests {
         println!("{}", expected_ast);
         assert_eq!(
             expected_ast,
-            lang_parser::statement(
+            lang_parser::parser(
                 r#"{
                 var a = 1;
                 var b = 2;
@@ -544,17 +557,54 @@ mod tests {
         let expected_ast = AST::Main(vec![AST::Block(vec![
             AST::Assert(1.into()),
             AST::Assert(1.into()),
+            AST::Call {
+                callee: "putchar".into(),
+                args: vec![AST::Number(84)],
+            },
         ])]);
         println!("{}", expected_ast);
         assert_eq!(
             expected_ast,
-            lang_parser::statement(
+            lang_parser::parser(
                 r#"function main() {
-                {
-                    assert(1);
-                    assert(1);
-                }
+                    {
+                        assert(1);
+                        assert(1);
+                        putchar(84);
+                    }
              }"#
+            )
+            .expect("Parser failed")
+        );
+    }
+    #[test]
+    fn block_stmt_within_main2() {
+        let expected_ast = AST::Main(vec![AST::Block(vec![
+            AST::IfNode {
+                conditional: 0.into(),
+                consequence: AST::Block(vec![AST::Assert(0.into()).into()]).into(),
+                alternative: AST::Block(vec![AST::Assert(1.into()).into()]).into(),
+            },
+            AST::Call {
+                callee: "putchar".into(),
+                args: vec![AST::Number(84)],
+            },
+        ])]);
+        println!("{}", expected_ast);
+        assert_eq!(
+            expected_ast,
+            lang_parser::parser(
+                r#"function main() {
+                { 
+                    if (0) {
+                        assert(0);
+                    } else {
+                        assert(1);
+                    }
+                    putchar(84);
+                }
+                
+            }"#,
             )
             .expect("Parser failed")
         );
@@ -578,7 +628,7 @@ mod tests {
         println!("{}", expected_ast);
         assert_eq!(
             expected_ast,
-            lang_parser::statement(
+            lang_parser::parser(
                 r#"if (a) {
                a = 1;
             } else {
@@ -609,7 +659,7 @@ mod tests {
         println!("{}", expected_ast);
         assert_eq!(
             expected_ast,
-            lang_parser::statement(
+            lang_parser::parser(
                 r#"while(a) {
                 b = 1;
                 a = 2;
@@ -646,7 +696,7 @@ mod tests {
         println!("{}", expected_ast);
         assert_eq!(
             expected_ast,
-            lang_parser::statement(
+            lang_parser::parser(
                 r#"function myFunc(a, b) {
                 b = 1;
                 while (a) {
@@ -706,7 +756,7 @@ mod tests {
         println!("{}", expected_ast);
         assert_eq!(
             expected_ast,
-            lang_parser::statement(
+            lang_parser::parser(
                 r#"function factorial(n) {
     var result = 1;
     while (n != 1) {
@@ -740,13 +790,48 @@ mod tests {
         println!("{}", expected_ast);
         assert_eq!(
             expected_ast,
-            lang_parser::statement(
+            lang_parser::parser(
                 r#"function main() {
                 b = 1;
                 while (a) {
                     b = 1;
                 }
             }"#
+            )
+            .expect("Parser failed")
+        );
+    }
+
+    #[test]
+    fn main_and_other_stmt() {
+        let expected_ast = AST::Block(vec![
+            AST::Main(vec![AST::Var {
+                name: "a".into(),
+                value: 1.into(),
+            }]),
+            AST::Function {
+                name: "other".into(),
+                parameters: vec![],
+                body: AST::Block(vec![AST::Var {
+                    name: "b".into(),
+                    value: 1.into(),
+                }])
+                .into(),
+            },
+        ]);
+        println!("{}", expected_ast);
+        assert_eq!(
+            expected_ast,
+            lang_parser::parser(
+                r#"
+                function main() {
+                    var a = 1;
+            }
+
+            function other() {
+                var b = 1;
+            }
+            "#
             )
             .expect("Parser failed")
         );

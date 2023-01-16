@@ -120,7 +120,7 @@ impl fmt::Display for AST {
                 body,
             } => write!(
                 f,
-                "function  {}({})\n{}\n",
+                "function {}({})\n{{\n{}\n}}\n",
                 name,
                 parameters.join(","),
                 body

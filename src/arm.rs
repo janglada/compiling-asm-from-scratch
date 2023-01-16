@@ -1,19 +1,19 @@
 use crate::ast::AST;
-use crate::emitter::{Emit, Environment};
+use crate::emitter::{Backend, Environment};
 use std::collections::HashMap;
 use std::io::Write;
 
-struct ArmCode {
+struct ArmBackend {
     label_counter: u16,
 }
 
-impl Default for ArmCode {
+impl Default for ArmBackend {
     fn default() -> Self {
-        ArmCode { label_counter: 0 }
+        ArmBackend { label_counter: 0 }
     }
 }
 
-impl ArmCode {
+impl ArmBackend {
     fn emit_fn_prologue(&mut self, writer: &mut dyn Write) -> std::io::Result<()> {
         writeln!(writer, "\tpush {{fp, lr}}")?;
         writeln!(writer, "\tmov fp, sp")?;
@@ -29,15 +29,10 @@ impl ArmCode {
     }
 }
 
-impl Emit for ArmCode {
+impl Backend for ArmBackend {
     fn emit(&self) {
         todo!()
     }
-    fn new_label(&mut self) -> String {
-        self.label_counter = self.label_counter + 1;
-        return format!(".L{}", self.label_counter);
-    }
-
     fn write(
         &mut self,
         ast: &AST,
@@ -70,7 +65,7 @@ impl Emit for ArmCode {
             AST::Return { term } => self.emit_return(term, env, writer),
             AST::Id(name) => self.emit_idnode(name, env, writer),
 
-            // AST::Return { .. } => {}
+            AST::Return { term } => self.emit_return(term, env, writer),
 
             // AST::Function { .. } => {}
             // AST::Var { .. } => {}
@@ -88,97 +83,6 @@ impl Emit for ArmCode {
         //     Ok(())
         // }
     }
-    fn emit_add(
-        &mut self,
-        left: &Box<AST>,
-        right: &Box<AST>,
-        env: Option<&Environment>,
-        writer: &mut dyn Write,
-    ) -> std::io::Result<()> {
-        self.emit_infix_operands(left, right, env, writer);
-        write!(writer, "\t")?;
-        writeln!(writer, "add r0, r0, r1")
-    }
-
-    fn emit_subtract(
-        &mut self,
-        left: &Box<AST>,
-        right: &Box<AST>,
-        env: Option<&Environment>,
-        writer: &mut dyn Write,
-    ) -> std::io::Result<()> {
-        self.emit_infix_operands(left, right, env, writer);
-        write!(writer, "\t")?;
-        writeln!(writer, "sub r0, r0, r1")
-    }
-    fn emit_multiply(
-        &mut self,
-        left: &Box<AST>,
-        right: &Box<AST>,
-        env: Option<&Environment>,
-        writer: &mut dyn Write,
-    ) -> std::io::Result<()> {
-        self.emit_infix_operands(left, right, env, writer);
-        write!(writer, "\t")?;
-        writeln!(writer, "mul r0, r0, r1")
-    }
-    fn emit_divide(
-        &mut self,
-        left: &Box<AST>,
-        right: &Box<AST>,
-        env: Option<&Environment>,
-        writer: &mut dyn Write,
-    ) -> std::io::Result<()> {
-        self.emit_infix_operands(left, right, env, writer);
-        write!(writer, "\t")?;
-        writeln!(writer, "udiv r0, r0, r1")
-    }
-    fn emit_equal(
-        &mut self,
-        left: &Box<AST>,
-        right: &Box<AST>,
-        env: Option<&Environment>,
-        writer: &mut dyn Write,
-    ) -> std::io::Result<()> {
-        self.emit_infix_operands(left, right, env, writer);
-        writeln!(
-            writer,
-            r#"
-    cmp r0, r1
-    moveq r0, #1
-    movne r0, #0
-        "#
-        )
-    }
-    fn emit_not_equal(
-        &mut self,
-        left: &Box<AST>,
-        right: &Box<AST>,
-        env: Option<&Environment>,
-        writer: &mut dyn Write,
-    ) -> std::io::Result<()> {
-        self.emit_infix_operands(left, right, env, writer);
-        writeln!(
-            writer,
-            r#"
-    cmp r0, r1
-    moveq r0, #0
-    movne r0, #1
-        "#
-        )
-    }
-    fn emit_infix_operands(
-        &mut self,
-        left: &Box<AST>,
-        right: &Box<AST>,
-        env: Option<&Environment>,
-        writer: &mut dyn Write,
-    ) {
-        self.write(left, env, writer).unwrap();
-        writeln!(writer, "\tpush {{r0, ip}}").unwrap();
-        self.write(right, env, writer).unwrap();
-        writeln!(writer, "\tpop {{r1, ip}}").unwrap();
-    }
 
     fn emit_not(
         &mut self,
@@ -189,14 +93,11 @@ impl Emit for ArmCode {
         self.write(term, env, writer)?;
         writeln!(
             writer,
-            r#"
-    cmp r0, #0
+            r#" cmp r0, #0
     moveq r0, #1
-    movne r0, #0    
-        "#
+    movne r0, #0"#
         )
     }
-
     fn emit_number(
         &mut self,
         number: &u64,
@@ -217,18 +118,15 @@ impl Emit for ArmCode {
         self.write(condition, env, writer)?;
         writeln!(
             writer,
-            r#"
-    cmp r0, #1
+            r#" cmp r0, #1
     moveq r0, #'T'
     movne r0, #'F'
-    bl putchar        
-        "#
+    bl putchar"#
         )
         // writeln!(writer, "\t moveq r0, #'.'");
         // writeln!(writer, "\t movne r0, #'F'");
         // writeln!(writer, "\t bl putchar");
     }
-
     ///
     ///
     ///
@@ -247,7 +145,6 @@ impl Emit for ArmCode {
         writeln!(writer, "\tmov r0, #0")?;
         writeln!(writer, "\tpop {{fp, pc}}")
     }
-
     fn emit_block(
         &mut self,
         statements: &Vec<AST>,
@@ -258,6 +155,96 @@ impl Emit for ArmCode {
             self.write(statement, env, writer)?;
         }
         Ok(())
+    }
+    fn emit_add(
+        &mut self,
+        left: &Box<AST>,
+        right: &Box<AST>,
+        env: Option<&Environment>,
+        writer: &mut dyn Write,
+    ) -> std::io::Result<()> {
+        self.emit_infix_operands(left, right, env, writer);
+        write!(writer, "\t")?;
+        writeln!(writer, "add r0, r0, r1")
+    }
+    fn emit_infix_operands(
+        &mut self,
+        left: &Box<AST>,
+        right: &Box<AST>,
+        env: Option<&Environment>,
+        writer: &mut dyn Write,
+    ) {
+        self.write(left, env, writer).unwrap();
+        writeln!(writer, "\tpush {{r0, ip}}").unwrap();
+        self.write(right, env, writer).unwrap();
+        writeln!(writer, "\tpop {{r1, ip}}").unwrap();
+    }
+    fn emit_subtract(
+        &mut self,
+        left: &Box<AST>,
+        right: &Box<AST>,
+        env: Option<&Environment>,
+        writer: &mut dyn Write,
+    ) -> std::io::Result<()> {
+        self.emit_infix_operands(left, right, env, writer);
+        write!(writer, "\t")?;
+        writeln!(writer, "sub r0, r0, r1")
+    }
+
+    fn emit_divide(
+        &mut self,
+        left: &Box<AST>,
+        right: &Box<AST>,
+        env: Option<&Environment>,
+        writer: &mut dyn Write,
+    ) -> std::io::Result<()> {
+        self.emit_infix_operands(left, right, env, writer);
+        write!(writer, "\t")?;
+        writeln!(writer, "udiv r0, r0, r1")
+    }
+
+    fn emit_multiply(
+        &mut self,
+        left: &Box<AST>,
+        right: &Box<AST>,
+        env: Option<&Environment>,
+        writer: &mut dyn Write,
+    ) -> std::io::Result<()> {
+        self.emit_infix_operands(left, right, env, writer);
+        write!(writer, "\t")?;
+        writeln!(writer, "mul r0, r0, r1")
+    }
+
+    fn emit_equal(
+        &mut self,
+        left: &Box<AST>,
+        right: &Box<AST>,
+        env: Option<&Environment>,
+        writer: &mut dyn Write,
+    ) -> std::io::Result<()> {
+        self.emit_infix_operands(left, right, env, writer);
+        writeln!(
+            writer,
+            r#" cmp r0, r1
+    moveq r0, #1
+    movne r0, #0"#
+        )
+    }
+
+    fn emit_not_equal(
+        &mut self,
+        left: &Box<AST>,
+        right: &Box<AST>,
+        env: Option<&Environment>,
+        writer: &mut dyn Write,
+    ) -> std::io::Result<()> {
+        self.emit_infix_operands(left, right, env, writer);
+        writeln!(
+            writer,
+            r#"cmp r0, r1
+    moveq r0, #0
+    movne r0, #1"#
+        )
     }
 
     fn emit_call(
@@ -292,26 +279,6 @@ impl Emit for ArmCode {
         }
     }
 
-    fn emit_ifnode(
-        &mut self,
-        conditional: &Box<AST>,
-        consequence: &Box<AST>,
-        alternative: &Box<AST>,
-        env: Option<&Environment>,
-        writer: &mut dyn Write,
-    ) -> std::io::Result<()> {
-        let if_false_label = self.new_label();
-        let end_if_label = self.new_label();
-        self.write(conditional, env, writer)?;
-        writeln!(writer, "\tcmp r0, #0")?;
-        writeln!(writer, "\tbeq {}", if_false_label)?;
-        self.write(consequence, env, writer)?;
-        writeln!(writer, "\tb {}", end_if_label)?;
-        writeln!(writer, "{}:", if_false_label)?;
-        self.write(alternative, env, writer)?;
-        writeln!(writer, "{}:", end_if_label)
-    }
-
     fn emit_function(
         &mut self,
         name: &String,
@@ -336,6 +303,26 @@ impl Emit for ArmCode {
         self.emit_fn_epilogue(writer)
     }
 
+    fn emit_ifnode(
+        &mut self,
+        conditional: &Box<AST>,
+        consequence: &Box<AST>,
+        alternative: &Box<AST>,
+        env: Option<&Environment>,
+        writer: &mut dyn Write,
+    ) -> std::io::Result<()> {
+        let if_false_label = self.new_label();
+        let end_if_label = self.new_label();
+        self.write(conditional, env, writer)?;
+        writeln!(writer, "\tcmp r0, #0")?;
+        writeln!(writer, "\tbeq {}", if_false_label)?;
+        self.write(consequence, env, writer)?;
+        writeln!(writer, "\tb {}", end_if_label)?;
+        writeln!(writer, "{}:", if_false_label)?;
+        self.write(alternative, env, writer)?;
+        writeln!(writer, "{}:", end_if_label)
+    }
+
     fn emit_idnode(
         &mut self,
         name: &String,
@@ -347,7 +334,7 @@ impl Emit for ArmCode {
             .locals
             .get(name)
             .expect(format!("Undefined variable: {}", name).as_str());
-        writeln!(writer, "\t ldr r0, [fp, #{}]", offset)
+        writeln!(writer, "\tldr r0, [fp, #{}]", offset)
     }
 
     fn emit_return(
@@ -360,6 +347,11 @@ impl Emit for ArmCode {
         writeln!(writer, "\tmov sp, fp")?;
         writeln!(writer, "\tpop {{fp, pc}}")
     }
+
+    fn new_label(&mut self) -> String {
+        self.label_counter = self.label_counter + 1;
+        return format!(".L{}", self.label_counter);
+    }
 }
 #[cfg(test)]
 mod tests {
@@ -371,9 +363,11 @@ mod tests {
     use std::{env, io};
 
     fn compile_and_run(code: &str) -> Result<(), CompileError> {
-        let mut arm_code = ArmCode {
+        let mut arm_code = ArmBackend {
             ..Default::default()
         };
+
+        let file_base_name = format!("tmp/test_{:x}", md5::compute(code));
 
         let ast = parse(code).expect("Parse error");
 
@@ -381,7 +375,7 @@ mod tests {
             .write(
                 &ast,
                 Option::None,
-                &mut File::create("test.s").expect("Open file failed"),
+                &mut File::create(format!("{}.s", file_base_name)).expect("Open file failed"),
             )
             .map_err(|e| CompileError::IOError(e))
             .expect("Could not generate assembly");
@@ -391,10 +385,11 @@ mod tests {
         // arm-linux-gnueabihf-gcc -static test.s
 
         let mut compile_result = Command::new("arm-linux-gnueabihf-gcc")
+            // .arg("-g")
             .arg("-static")
-            .arg("test.s")
+            .arg(format!("{}.s", file_base_name))
             .arg("-o")
-            .arg("test.bin")
+            .arg(format!("{}.bin", file_base_name))
             .output();
 
         let codegen_result: Result<(), CompileError> = match compile_result {
@@ -405,13 +400,14 @@ mod tests {
                 if output.status.success() {
                     Ok(())
                 } else {
-                    return Err(CompileError::CodeGenError(format!("{:?}", &output.stderr)));
+                    let errmsg = String::from_utf8_lossy(&output.stderr).into_owned();
+                    return Err(CompileError::CodeGenError(errmsg));
                 }
             }
             Err(e) => return Err(CompileError::CodeGenError(e.to_string())),
         };
 
-        let execution_res = match Command::new("./test.bin").output() {
+        let execution_res = match Command::new(format!("./{}.bin", file_base_name)).output() {
             Ok(output) => {
                 io::stdout().write_all(&output.stdout).unwrap();
                 io::stderr().write_all(&output.stderr).unwrap();
@@ -419,10 +415,12 @@ mod tests {
                 if output.status.success() {
                     Ok(())
                 } else {
-                    return Err(CompileError::RuntimeError(format!("{:?}", &output.stderr)));
+                    let errmsg = String::from_utf8_lossy(&output.stderr).into_owned();
+
+                    return Err(CompileError::RuntimeError(errmsg, output.status.code()));
                 }
             }
-            Err(e) => return Err(CompileError::RuntimeError(e.to_string())),
+            Err(e) => return Err(CompileError::RuntimeError(e.to_string(), Option::None)),
         };
 
         execution_res
@@ -514,8 +512,37 @@ mod tests {
                     } else {
                         assert(1);
                     }
+                     putchar(84);
                 }
+                
             }"#,
+        )
+    }
+
+    #[test]
+    fn compile_function_assert() -> Result<(), CompileError> {
+        compile_and_run(
+            r#"function main() {
+                { 
+                    assert1234(1,2,3,4);
+                }
+                function myassert(x) {
+                    if (x) {
+                        putchar(84);
+                        putchar(10);
+                    } else {
+                        putchar(70);
+                        putchar(10);
+                    }
+                   
+                }
+                function assert1234(a, b, c, d) {
+                    putchar(a);
+                    putchar(b);
+                    putchar(c);
+                    putchar(d);
+                }                
+            "#,
         )
     }
     #[test]
@@ -523,36 +550,46 @@ mod tests {
         compile_and_run(
             r#"function main() {
                 { 
-                    function asserttt(a, b, c, d) {
-                        assert(a == 1);
-                        assert(b == 2);
-                        assert(c == 3);
-                        assert(d == 4);
-                    }
+
                     
                     asserttt(1, 2, 5, 4, 5);
                     
                 }
+                
+                function asserttt(a, b, c, d) {
+                    assert(a == 1);
+                    assert(b == 2);
+                    assert(c == 3);
+                    assert(d == 4);
+                }                
+                
             }"#,
         )
     }
+
+    #[test]
+    fn main_return() -> Result<(), CompileError> {
+        compile_and_run(
+            r#"function main() {             
+                return 0;
+            }"#,
+        )
+    }
+
     #[test]
     fn factorial() -> Result<(), CompileError> {
         compile_and_run(
             r#"function main() {
-                { 
-                    function factorial(n) {
-                        if (n == 0) {
-                            return 1;
-                        } else {
-                            return n * factorial(n - 1);
-                        }
-                    }
-                    
-                   assert(factorial(5) == 120);
-                    
+                    assert(factorial(5) == 120);
+            }
+           function factorial(n) {
+                if (n == 0) {
+                    return 1;
+                } else {
+                    return n *  factorial(n - 1);
                 }
-            }"#,
+           }
+            "#,
         )
     }
 }

@@ -8,5 +8,5 @@ pub enum CompileError {
     IOError(std::io::Error),
     CodeGenError(String),
     SyntaxError(String),
-    RuntimeError(String),
+    RuntimeError(String, Option<i32>),
 }

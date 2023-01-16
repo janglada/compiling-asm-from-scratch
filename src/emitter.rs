@@ -6,7 +6,7 @@ pub struct Environment {
     pub(crate) locals: HashMap<String, isize>,
 }
 
-pub trait Emit {
+pub trait Backend {
     fn emit(&self);
     fn write(
         &mut self,
