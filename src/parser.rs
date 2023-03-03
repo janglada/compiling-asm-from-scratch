@@ -329,10 +329,11 @@ mod tests {
     #[test]
     fn infix() {
         let expected_ast = AST::Equal {
+            left: 42.into(),
             right: AST::Add {
-                left: 4.into(),
-                right: AST::Add {
-                    left: AST::Multiply {
+                left: AST::Add {
+                    left: 4.into(),
+                    right: AST::Multiply {
                         left: 2.into(),
                         right: AST::Subtract {
                             left: 12.into(),
@@ -341,20 +342,19 @@ mod tests {
                         .into(),
                     }
                     .into(),
-                    right: AST::Multiply {
-                        left: 3.into(),
-                        right: AST::Add {
-                            left: 5.into(),
-                            right: 1.into(),
-                        }
-                        .into(),
+                }
+                .into(),
+                right: AST::Multiply {
+                    left: 3.into(),
+                    right: AST::Add {
+                        left: 5.into(),
+                        right: 1.into(),
                     }
                     .into(),
                 }
                 .into(),
             }
             .into(),
-            left: 42.into(),
         };
         println!("{}", expected_ast);
 
@@ -362,6 +362,8 @@ mod tests {
             expected_ast,
             lang_parser::expression("42 == 4 + 2 * (12 - 2) + 3 * (5 + 1)").expect("Parser failed")
         );
+        // 42 == 4 +(2+(12-2) + (3*(5+1))
+        // 42 == (4+2*(12-2) + 3*(5+1)
     }
     ///
     ///
