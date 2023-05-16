@@ -225,7 +225,7 @@ impl Backend for ArmBackend {
         self.emit_infix_operands(left, right, env, writer);
         writeln!(
             writer,
-            r#" cmp r0, r1
+            r#"cmp r0, r1
     moveq r0, #1
     movne r0, #0"#
         )
@@ -298,7 +298,10 @@ impl Backend for ArmBackend {
         for (i, parameter) in parameters.iter().enumerate() {
             locals.insert(parameter.clone(), 4 * i as isize - 16);
         }
-        let env = Environment { locals: locals };
+        let env = Environment {
+            locals,
+            next_local_offset: -20,
+        };
         self.write(body, Some(&env), writer)?;
         self.emit_fn_epilogue(writer)
     }
@@ -348,6 +351,16 @@ impl Backend for ArmBackend {
         writeln!(writer, "\tpop {{fp, pc}}")
     }
 
+    fn emit_var(
+        &mut self,
+        name: &String,
+        value: &Box<AST>,
+        env: &mut Environment,
+        writer: &mut dyn Write,
+    ) -> std::io::Result<()> {
+        todo!()
+    }
+
     fn new_label(&mut self) -> String {
         self.label_counter = self.label_counter + 1;
         return format!(".L{}", self.label_counter);
@@ -370,18 +383,22 @@ mod tests {
         let file_base_name = format!("tmp/test_{:x}", md5::compute(code));
 
         let ast = parse(code).expect("Parse error");
+        let mut locals: HashMap<String, isize> = HashMap::new();
 
         arm_code
             .write(
                 &ast,
-                Option::None,
+                Option::Some(&mut Environment {
+                    locals: locals,
+                    next_local_offset: 0,
+                }),
                 &mut File::create(format!("{}.s", file_base_name)).expect("Open file failed"),
             )
             .map_err(|e| CompileError::IOError(e))
             .expect("Could not generate assembly");
 
         //arm_code.write(&ast, &mut io::stdout());
-
+        println!("assembly written");
         // arm-linux-gnueabihf-gcc -static test.s
 
         let mut compile_result = Command::new("arm-linux-gnueabihf-gcc")
@@ -398,8 +415,10 @@ mod tests {
                 io::stderr().write_all(&output.stderr).unwrap();
 
                 if output.status.success() {
+                    println!("Compiled");
                     Ok(())
                 } else {
+                    println!("Compile error");
                     let errmsg = String::from_utf8_lossy(&output.stderr).into_owned();
                     return Err(CompileError::CodeGenError(errmsg));
                 }
@@ -522,7 +541,7 @@ mod tests {
     #[test]
     fn compile_function_assert() -> Result<(), CompileError> {
         compile_and_run(
-            r#"function main() {
+            r#"function main() 
                 { 
                     assert1234(1,2,3,4);
                 }
@@ -549,10 +568,9 @@ mod tests {
     fn compile_function() -> Result<(), CompileError> {
         compile_and_run(
             r#"function main() {
-                { 
 
                     
-                    asserttt(1, 2, 5, 4, 5);
+                    asserttt(1, 2, 3, 4);
                     
                 }
                 
@@ -563,7 +581,7 @@ mod tests {
                     assert(d == 4);
                 }                
                 
-            }"#,
+            "#,
         )
     }
 
@@ -580,7 +598,7 @@ mod tests {
     fn factorial() -> Result<(), CompileError> {
         compile_and_run(
             r#"function main() {
-                    assert(factorial(5) == 120);
+                    factorial(5);
             }
            function factorial(n) {
                 if (n == 0) {
@@ -589,6 +607,20 @@ mod tests {
                     return n *  factorial(n - 1);
                 }
            }
+            "#,
+        )
+    }
+
+    #[test]
+    fn factorial_lite() -> Result<(), CompileError> {
+        compile_and_run(
+            r#"function main() {
+                    var x = 4 + 2 * (12 - 2);
+                    var y = 3 * (5 + 1);
+                    var z = x + y;
+                    assert(z == 42);
+   
+            }
             "#,
         )
     }

@@ -4,6 +4,7 @@ use std::io::Write;
 
 pub struct Environment {
     pub(crate) locals: HashMap<String, isize>,
+    pub(crate) next_local_offset: isize,
 }
 
 pub trait Backend {
@@ -130,6 +131,14 @@ pub trait Backend {
         &mut self,
         term: &Box<AST>,
         env: Option<&Environment>,
+        writer: &mut dyn Write,
+    ) -> std::io::Result<()>;
+
+    fn emit_var(
+        &mut self,
+        name: &String,
+        value: &Box<AST>,
+        env: &mut Environment,
         writer: &mut dyn Write,
     ) -> std::io::Result<()>;
 
