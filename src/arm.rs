@@ -101,7 +101,7 @@ impl Backend for ArmBackend {
     fn emit_number(
         &mut self,
         number: &u64,
-        env: Option<&Environment>,
+        _env: Option<&Environment>,
         writer: &mut dyn Write,
     ) -> std::io::Result<()> {
         writeln!(writer, "\tldr r0, ={}", number)
@@ -353,10 +353,10 @@ impl Backend for ArmBackend {
 
     fn emit_var(
         &mut self,
-        name: &String,
-        value: &Box<AST>,
-        env: &mut Environment,
-        writer: &mut dyn Write,
+        _name: &String,
+        _value: &Box<AST>,
+        _env: &mut Environment,
+        _writer: &mut dyn Write,
     ) -> std::io::Result<()> {
         todo!()
     }
@@ -369,11 +369,11 @@ impl Backend for ArmBackend {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::error::{CodeGenError, CompileError};
+    use crate::error::{CompileError};
     use crate::parser::parse;
     use std::fs::File;
-    use std::process::{Command, Stdio};
-    use std::{env, io};
+    use std::process::{Command};
+    use std::{io};
 
     struct Output {
         pub stdout: Vec<u8>,
@@ -388,7 +388,7 @@ mod tests {
         let file_base_name = format!("tmp/test_{:x}", md5::compute(code));
 
         let ast = parse(code).expect("Parse error");
-        let mut locals: HashMap<String, isize> = HashMap::new();
+        let locals: HashMap<String, isize> = HashMap::new();
 
         arm_code
             .write(
@@ -406,7 +406,7 @@ mod tests {
         println!("assembly written");
         // arm-linux-gnueabihf-gcc -static test.s
 
-        let mut compile_result = Command::new("arm-linux-gnueabihf-gcc")
+        let compile_result = Command::new("arm-linux-gnueabihf-gcc")
             // .arg("-g")
             .arg("-static")
             .arg(format!("{}.s", file_base_name))
@@ -414,7 +414,7 @@ mod tests {
             .arg(format!("{}.bin", file_base_name))
             .output();
 
-        let codegen_result: Result<(), CompileError> = match compile_result {
+        let _codegen_result: Result<(), CompileError> = match compile_result {
             Ok(output) => {
                 io::stdout().write_all(&output.stdout).unwrap();
                 io::stderr().write_all(&output.stderr).unwrap();

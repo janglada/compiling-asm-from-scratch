@@ -1,7 +1,7 @@
 use crate::ast::AST;
 use crate::error::CompileError;
-use peg::error::ParseError;
-use peg::str::LineCol;
+
+
 
 peg::parser! {
   pub grammar lang_parser() for str {
@@ -236,7 +236,7 @@ pub fn parse(input: &str) -> Result<AST, CompileError> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::ast::AST::{Block, Main};
+    
 
     #[test]
     fn number() {
