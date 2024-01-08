@@ -375,7 +375,12 @@ mod tests {
     use std::process::{Command, Stdio};
     use std::{env, io};
 
-    fn compile_and_run(code: &str) -> Result<(), CompileError> {
+    struct Output {
+        pub stdout: Vec<u8>,
+        pub stderr: Vec<u8>,
+    }
+
+    fn compile_and_run(code: &str) -> Result<Output, CompileError> {
         let mut arm_code = ArmBackend {
             ..Default::default()
         };
@@ -432,7 +437,10 @@ mod tests {
                 io::stderr().write_all(&output.stderr).unwrap();
 
                 if output.status.success() {
-                    Ok(())
+                    Ok(Output {
+                        stdout: output.stdout.clone(),
+                        stderr: output.stdout.clone(),
+                    })
                 } else {
                     let errmsg = String::from_utf8_lossy(&output.stderr).into_owned();
 
@@ -454,36 +462,40 @@ mod tests {
                     b = 1;
                 }
             }"#,
-        );
+        )
+        .expect("TODO: panic message");
     }
 
     #[test]
-    fn compile_assert() -> Result<(), CompileError> {
-        compile_and_run(
+    fn compile_assert() {
+        let result = compile_and_run(
             r#"function main() {
                 assert(0);
             }"#,
         )
+        .expect("Compile an run failed");
+
+        assert_eq!("F".to_string(), String::from_utf8(result.stdout).unwrap());
     }
     #[test]
-    fn compile_not() -> Result<(), CompileError> {
+    fn compile_not() {
         compile_and_run(
             r#"function main() {
                 assert(!1);
             }"#,
-        )
+        );
     }
 
     #[test]
-    fn compile_infix() -> Result<(), CompileError> {
+    fn compile_infix() {
         compile_and_run(
             r#"function main() {
                 assert(42 == 4 + 2 * (12 - 2) + 3 * (5 + 1));
             }"#,
-        )
+        );
     }
     #[test]
-    fn compile_block() -> Result<(), CompileError> {
+    fn compile_block() {
         compile_and_run(
             r#"function main() {
                 { 
@@ -491,10 +503,10 @@ mod tests {
                     assert(1);
                 }
             }"#,
-        )
+        );
     }
     #[test]
-    fn compile_call() -> Result<(), CompileError> {
+    fn compile_call() {
         compile_and_run(
             r#"function main() {
                 { 
@@ -504,11 +516,11 @@ mod tests {
                     var a = rand() != 42;
                 }
             }"#,
-        )
+        );
     }
 
     #[test]
-    fn compile_if_1() -> Result<(), CompileError> {
+    fn compile_if_1() {
         compile_and_run(
             r#"function main() {
                 { 
@@ -519,10 +531,10 @@ mod tests {
                     }
                 }
             }"#,
-        )
+        );
     }
     #[test]
-    fn compile_if_2() -> Result<(), CompileError> {
+    fn compile_if_2() {
         compile_and_run(
             r#"function main() {
                 { 
@@ -535,11 +547,11 @@ mod tests {
                 }
                 
             }"#,
-        )
+        );
     }
 
     #[test]
-    fn compile_function_assert() -> Result<(), CompileError> {
+    fn compile_function_assert() {
         compile_and_run(
             r#"function main() 
                 { 
@@ -562,10 +574,10 @@ mod tests {
                     putchar(d);
                 }                
             "#,
-        )
+        );
     }
     #[test]
-    fn compile_function() -> Result<(), CompileError> {
+    fn compile_function() {
         compile_and_run(
             r#"function main() {
 
@@ -582,20 +594,20 @@ mod tests {
                 }                
                 
             "#,
-        )
+        );
     }
 
     #[test]
-    fn main_return() -> Result<(), CompileError> {
+    fn main_return() {
         compile_and_run(
             r#"function main() {             
                 return 0;
             }"#,
-        )
+        );
     }
 
     #[test]
-    fn factorial() -> Result<(), CompileError> {
+    fn factorial() {
         compile_and_run(
             r#"function main() {
                     factorial(5);
@@ -608,11 +620,11 @@ mod tests {
                 }
            }
             "#,
-        )
+        );
     }
 
     #[test]
-    fn factorial_lite() -> Result<(), CompileError> {
+    fn factorial_lite() {
         compile_and_run(
             r#"function main() {
                     var x = 4 + 2 * (12 - 2);
@@ -622,6 +634,6 @@ mod tests {
    
             }
             "#,
-        )
+        );
     }
 }
