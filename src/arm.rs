@@ -116,9 +116,10 @@ impl Backend for ArmBackend {
         writer: &mut dyn Write,
     ) -> std::io::Result<()> {
         self.write(condition, env, writer)?;
+        write!(writer, "\t")?;
         writeln!(
             writer,
-            r#" cmp r0, #1
+            r#"cmp r0, #1
     moveq r0, #'T'
     movne r0, #'F'
     bl putchar"#
@@ -164,8 +165,7 @@ impl Backend for ArmBackend {
         writer: &mut dyn Write,
     ) -> std::io::Result<()> {
         self.emit_infix_operands(left, right, env, writer);
-        write!(writer, "\t")?;
-        writeln!(writer, "add r0, r0, r1")
+        writeln!(writer, "\tadd r0, r0, r1")
     }
     fn emit_infix_operands(
         &mut self,
@@ -187,8 +187,7 @@ impl Backend for ArmBackend {
         writer: &mut dyn Write,
     ) -> std::io::Result<()> {
         self.emit_infix_operands(left, right, env, writer);
-        write!(writer, "\t")?;
-        writeln!(writer, "sub r0, r0, r1")
+        writeln!(writer, "\tsub r0, r0, r1")
     }
 
     fn emit_divide(
@@ -199,8 +198,7 @@ impl Backend for ArmBackend {
         writer: &mut dyn Write,
     ) -> std::io::Result<()> {
         self.emit_infix_operands(left, right, env, writer);
-        write!(writer, "\t")?;
-        writeln!(writer, "udiv r0, r0, r1")
+        writeln!(writer, "\tudiv r0, r0, r1")
     }
 
     fn emit_multiply(
@@ -211,8 +209,7 @@ impl Backend for ArmBackend {
         writer: &mut dyn Write,
     ) -> std::io::Result<()> {
         self.emit_infix_operands(left, right, env, writer);
-        write!(writer, "\t")?;
-        writeln!(writer, "mul r0, r0, r1")
+        writeln!(writer, "\tmul r0, r0, r1")
     }
 
     fn emit_equal(
@@ -223,6 +220,7 @@ impl Backend for ArmBackend {
         writer: &mut dyn Write,
     ) -> std::io::Result<()> {
         self.emit_infix_operands(left, right, env, writer);
+        write!(writer, "\t")?;
         writeln!(
             writer,
             r#"cmp r0, r1
@@ -239,6 +237,7 @@ impl Backend for ArmBackend {
         writer: &mut dyn Write,
     ) -> std::io::Result<()> {
         self.emit_infix_operands(left, right, env, writer);
+        write!(writer, "\t")?;
         writeln!(
             writer,
             r#"cmp r0, r1
@@ -369,11 +368,11 @@ impl Backend for ArmBackend {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::error::{CompileError};
+    use crate::error::CompileError;
     use crate::parser::parse;
     use std::fs::File;
-    use std::process::{Command};
-    use std::{io};
+    use std::io;
+    use std::process::Command;
 
     struct Output {
         pub stdout: Vec<u8>,
@@ -485,14 +484,62 @@ mod tests {
             }"#,
         );
     }
+    #[test]
+    fn compile_basic_infix() {
+        let result = compile_and_run(
+            r#"function main() {
+                assert(42 == 42);
+            }"#,
+        )
+        .expect("Compile an run failed");
+
+        assert_eq!("T".to_string(), String::from_utf8(result.stdout).unwrap());
+
+        let result_fail = compile_and_run(
+            r#"function main() {
+                assert(42 == 11111);
+            }"#,
+        )
+        .expect("Compile an run failed");
+
+        assert_eq!(
+            "F".to_string(),
+            String::from_utf8(result_fail.stdout).unwrap()
+        );
+    }
 
     #[test]
     fn compile_infix() {
-        compile_and_run(
+        let result = compile_and_run(
             r#"function main() {
                 assert(42 == 4 + 2 * (12 - 2) + 3 * (5 + 1));
             }"#,
-        );
+        )
+        .expect("Compile an run failed");
+
+        assert_eq!("T".to_string(), String::from_utf8(result.stdout).unwrap());
+    }
+    #[test]
+    fn compile_infix2() {
+        let result = compile_and_run(
+            r#"function main() {
+                assert(2 ==  3-1 );
+            }"#,
+        )
+        .expect("Compile an run failed");
+
+        assert_eq!("T".to_string(), String::from_utf8(result.stdout).unwrap());
+    }
+    #[test]
+    fn compile_infix3() {
+        let result = compile_and_run(
+            r#"function main() {
+                assert(6 == 4 + (3-1) );
+            }"#,
+        )
+        .expect("Compile an run failed");
+
+        assert_eq!("T".to_string(), String::from_utf8(result.stdout).unwrap());
     }
     #[test]
     fn compile_block() {
