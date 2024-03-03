@@ -365,6 +365,7 @@ impl Backend for ArmBackend {
         return format!(".L{}", self.label_counter);
     }
 }
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -462,7 +463,7 @@ mod tests {
                 }
             }"#,
         )
-        .expect("TODO: panic message");
+            .expect("TODO: panic message");
     }
 
     #[test]
@@ -472,10 +473,11 @@ mod tests {
                 assert(0);
             }"#,
         )
-        .expect("Compile an run failed");
+            .expect("Compile an run failed");
 
         assert_eq!("F".to_string(), String::from_utf8(result.stdout).unwrap());
     }
+
     #[test]
     fn compile_not() {
         compile_and_run(
@@ -484,6 +486,7 @@ mod tests {
             }"#,
         );
     }
+
     #[test]
     fn compile_basic_infix() {
         let result = compile_and_run(
@@ -491,7 +494,7 @@ mod tests {
                 assert(42 == 42);
             }"#,
         )
-        .expect("Compile an run failed");
+            .expect("Compile an run failed");
 
         assert_eq!("T".to_string(), String::from_utf8(result.stdout).unwrap());
 
@@ -500,7 +503,7 @@ mod tests {
                 assert(42 == 11111);
             }"#,
         )
-        .expect("Compile an run failed");
+            .expect("Compile an run failed");
 
         assert_eq!(
             "F".to_string(),
@@ -515,21 +518,23 @@ mod tests {
                 assert(42 == 4 + 2 * (12 - 2) + 3 * (5 + 1));
             }"#,
         )
-        .expect("Compile an run failed");
+            .expect("Compile an run failed");
 
         assert_eq!("T".to_string(), String::from_utf8(result.stdout).unwrap());
     }
+
     #[test]
     fn compile_infix2() {
         let result = compile_and_run(
             r#"function main() {
-                assert(2 ==  3-1 );
+                assert(2==3-1);
             }"#,
         )
-        .expect("Compile an run failed");
+            .expect("Compile an run failed");
 
         assert_eq!("T".to_string(), String::from_utf8(result.stdout).unwrap());
     }
+
     #[test]
     fn compile_infix3() {
         let result = compile_and_run(
@@ -537,10 +542,11 @@ mod tests {
                 assert(6 == 4 + (3-1) );
             }"#,
         )
-        .expect("Compile an run failed");
+            .expect("Compile an run failed");
 
         assert_eq!("T".to_string(), String::from_utf8(result.stdout).unwrap());
     }
+
     #[test]
     fn compile_block() {
         compile_and_run(
@@ -552,6 +558,7 @@ mod tests {
             }"#,
         );
     }
+
     #[test]
     fn compile_call() {
         compile_and_run(
@@ -580,6 +587,7 @@ mod tests {
             }"#,
         );
     }
+
     #[test]
     fn compile_if_2() {
         compile_and_run(
@@ -623,6 +631,7 @@ mod tests {
             "#,
         );
     }
+
     #[test]
     fn compile_function() {
         compile_and_run(

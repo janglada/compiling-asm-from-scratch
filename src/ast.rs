@@ -179,9 +179,9 @@ mod tests {
                     left: AST::Number(20).into(),
                     right: AST::Number(20).into(),
                 }
-                .into(),
+                    .into(),
             )
-            .into(),
+                .into(),
         };
 
         println!("{}", ast);
