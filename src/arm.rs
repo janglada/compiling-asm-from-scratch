@@ -476,6 +476,15 @@ mod tests {
             .expect("Compile an run failed");
 
         assert_eq!("F".to_string(), String::from_utf8(result.stdout).unwrap());
+
+        let result = compile_and_run(
+            r#"function main() {
+                assert(1);
+            }"#,
+        )
+            .expect("Compile an run failed");
+
+        assert_eq!("T".to_string(), String::from_utf8(result.stdout).unwrap());
     }
 
     #[test]
