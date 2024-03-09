@@ -67,15 +67,15 @@ pub enum AST {
     Assert(Box<AST>),
 }
 
-impl Into<Box<AST>> for u8 {
-    fn into(self) -> Box<AST> {
-        Box::new(AST::Number(self as u64))
+impl From<u8> for Box<AST> {
+    fn from(val: u8) -> Self {
+        Box::new(AST::Number(val as u64))
     }
 }
 
-impl Into<Box<AST>> for String {
-    fn into(self) -> Box<AST> {
-        Box::new(AST::Id(self))
+impl From<String> for Box<AST> {
+    fn from(val: String) -> Self {
+        Box::new(AST::Id(val))
     }
 }
 
@@ -134,7 +134,7 @@ impl fmt::Display for AST {
                 write!(f, "{:?}", statements)
             }
             AST::Assert(condition) => {
-                write!(f, "{:?}", condition)
+                write!(f, "assert({})", condition)
             }
         }
     }

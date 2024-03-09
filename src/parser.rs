@@ -199,7 +199,7 @@ peg::parser! {
         = _ s:statement() ** _ {
             if s.len() == 1 {
 
-                    return s.get(0).unwrap().clone();
+                    return s.first().unwrap().clone();
 
             }
                 AST::Block(s)
@@ -232,7 +232,7 @@ peg::parser! {
 }
 
 pub fn parse(input: &str) -> Result<AST, CompileError> {
-    lang_parser::parser(input).map_err(|e| CompileError::ParseError(e))
+    lang_parser::parser(input).map_err(CompileError::ParseError)
 }
 
 #[cfg(test)]
@@ -453,6 +453,27 @@ mod tests {
     }
 
     #[test]
+    fn comparison_expr2() {
+        let expected_ast = AST::Equal {
+            left: 6.into(),
+            right: AST::Add {
+                left: 4.into(),
+                right: AST::Subtract {
+                    left: 3.into(),
+                    right: 1.into(),
+                }.into(),
+            }
+                .into(),
+        };
+        println!("{}", expected_ast);
+        assert_eq!(
+            expected_ast,
+            lang_parser::expression("6 == 4 + (3-1) ").expect("Parser failed")
+        )
+    }
+
+
+    #[test]
     fn call_simple() {
         let expected_ast = AST::Call {
             callee: "fname".to_string(),
@@ -539,6 +560,7 @@ mod tests {
         );
     }
 
+
     #[test]
     fn assign() {
         let expected_ast = AST::Assign {
@@ -556,6 +578,47 @@ mod tests {
         );
     }
 
+    #[test]
+    fn assign_and_use() {
+        let expected_ast = AST::Block(vec![
+            AST::Var {
+                name: "x".to_string(),
+                value: AST::Number(1).into(),
+            },
+            AST::Var {
+                name: "y".to_string(),
+                value: AST::Number(2).into(),
+            },
+            AST::Var {
+                name: "z".to_string(),
+                value: AST::Add {
+                    left: AST::Id("x".into()).into(),
+                    right: AST::Id("y".into()).into(),
+                }.into(),
+            },
+            AST::Assert(
+                AST::Equal {
+                    left: AST::Id("z".into()).into(),
+                    right: AST::Number(3).into(),
+                }.into()
+            ),
+        ]);
+        println!("{}", expected_ast);
+        assert_eq!(
+            expected_ast,
+            lang_parser::parser(
+                r#"{
+                    var x = 1;
+                    var y = 2;
+                    var z = x + y;
+                     assert(z == 3);
+             }"#
+            )
+                .expect("Parser failed")
+        );
+    }
+
+    //
     #[test]
     fn return_stmt() {
         let expected_ast = AST::Return {
@@ -636,8 +699,8 @@ mod tests {
         let expected_ast = AST::Main(vec![AST::Block(vec![
             AST::IfNode {
                 conditional: 0.into(),
-                consequence: AST::Block(vec![AST::Assert(0.into()).into()]).into(),
-                alternative: AST::Block(vec![AST::Assert(1.into()).into()]).into(),
+                consequence: AST::Block(vec![AST::Assert(0.into())]).into(),
+                alternative: AST::Block(vec![AST::Assert(1.into())]).into(),
             },
             AST::Call {
                 callee: "putchar".into(),

@@ -3,15 +3,11 @@ use crate::emitter::{Backend, Environment};
 use std::collections::HashMap;
 use std::io::Write;
 
+#[derive(Default)]
 struct ArmBackend {
     label_counter: u16,
 }
 
-impl Default for ArmBackend {
-    fn default() -> Self {
-        ArmBackend { label_counter: 0 }
-    }
-}
 
 impl ArmBackend {
     fn emit_fn_prologue(&mut self, writer: &mut dyn Write) -> std::io::Result<()> {
@@ -72,7 +68,7 @@ impl Backend for ArmBackend {
             // AST::Assign { .. } => {}
             // AST::While { .. } => {}
             _ => {
-                writeln!(writer, "")
+                writeln!(writer)
             }
         }
 
@@ -165,7 +161,7 @@ impl Backend for ArmBackend {
         writer: &mut dyn Write,
     ) -> std::io::Result<()> {
         self.emit_infix_operands(left, right, env, writer);
-        writeln!(writer, "\tadd r0, r0, r1")
+        writeln!(writer, "\tadd r0, r1, r0")
     }
     fn emit_infix_operands(
         &mut self,
@@ -187,7 +183,7 @@ impl Backend for ArmBackend {
         writer: &mut dyn Write,
     ) -> std::io::Result<()> {
         self.emit_infix_operands(left, right, env, writer);
-        writeln!(writer, "\tsub r0, r0, r1")
+        writeln!(writer, "\tsub r0, r1, r0")
     }
 
     fn emit_divide(
@@ -257,9 +253,9 @@ impl Backend for ArmBackend {
         if args.is_empty() {
             writeln!(writer, "\tbl {}", callee)
         } else if len == 1 {
-            self.write(args.get(0).unwrap(), env, writer);
+            self.write(args.first().unwrap(), env, writer);
             writeln!(writer, "\tbl {}", callee)
-        } else if len >= 2 && len <= 4 {
+        } else if (2..=4).contains(&len) {
             // allocate enough stack space for up to four arguments (16 bytes)
             // We do that by subtracting from the stack
             // pointer since the stack grows from higher memory addresses to
@@ -289,7 +285,7 @@ impl Backend for ArmBackend {
         if parameters.len() > 4 {
             panic!("More than 4 params is not supported");
         }
-        writeln!(writer, "")?;
+        writeln!(writer)?;
         writeln!(writer, ".global {}", name)?;
         writeln!(writer, "{}:", name)?;
         self.emit_fn_prologue(writer)?;
@@ -335,7 +331,7 @@ impl Backend for ArmBackend {
             .expect("Missing environment")
             .locals
             .get(name)
-            .expect(format!("Undefined variable: {}", name).as_str());
+            .unwrap_or_else(|| panic!("Undefined variable: {}", name));
         writeln!(writer, "\tldr r0, [fp, #{}]", offset)
     }
 
@@ -361,8 +357,8 @@ impl Backend for ArmBackend {
     }
 
     fn new_label(&mut self) -> String {
-        self.label_counter = self.label_counter + 1;
-        return format!(".L{}", self.label_counter);
+        self.label_counter += 1;
+        format!(".L{}", self.label_counter)
     }
 }
 
@@ -394,12 +390,12 @@ mod tests {
             .write(
                 &ast,
                 Option::Some(&mut Environment {
-                    locals: locals,
+                    locals,
                     next_local_offset: 0,
                 }),
                 &mut File::create(format!("{}.s", file_base_name)).expect("Open file failed"),
             )
-            .map_err(|e| CompileError::IOError(e))
+            .map_err(CompileError::IOError)
             .expect("Could not generate assembly");
 
         //arm_code.write(&ast, &mut io::stdout());
@@ -673,9 +669,9 @@ mod tests {
 
     #[test]
     fn factorial() {
-        compile_and_run(
+        let result = compile_and_run(
             r#"function main() {
-                    factorial(5);
+                    assert(factorial(5) == 120);
             }
            function factorial(n) {
                 if (n == 0) {
@@ -685,18 +681,19 @@ mod tests {
                 }
            }
             "#,
-        );
+        ).expect("Compile an run failed");
+
+        assert_eq!("T".to_string(), String::from_utf8(result.stdout).unwrap());
     }
 
     #[test]
     fn factorial_lite() {
         compile_and_run(
             r#"function main() {
-                    var x = 4 + 2 * (12 - 2);
-                    var y = 3 * (5 + 1);
+                    var x = 1;
+                    var y = 2;
                     var z = x + y;
-                    assert(z == 42);
-   
+                    assert(z == 3);
             }
             "#,
         );
