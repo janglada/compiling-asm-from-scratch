@@ -1,13 +1,13 @@
 use crate::ast::AST;
 use crate::emitter::{Backend, Environment};
-use std::collections::HashMap;
+use std::collections::{HashMap, LinkedList};
 use std::io::Write;
 
 #[derive(Default)]
 struct ArmBackend {
     label_counter: u16,
+    env: LinkedList<Environment>,
 }
-
 
 impl ArmBackend {
     fn emit_fn_prologue(&mut self, writer: &mut dyn Write) -> std::io::Result<()> {
@@ -29,43 +29,38 @@ impl Backend for ArmBackend {
     fn emit(&self) {
         todo!()
     }
-    fn write(
-        &mut self,
-        ast: &AST,
-        env: Option<&Environment>,
-        writer: &mut dyn Write,
-    ) -> std::io::Result<()> {
+    fn write(&mut self, ast: &AST, writer: &mut dyn Write) -> std::io::Result<()> {
         match ast {
-            AST::Main(statements) => self.emit_main(statements, env, writer),
-            AST::Assert(condition) => self.emit_assert(condition, env, writer),
-            AST::Number(number) => self.emit_number(number, env, writer),
-            AST::Not(term) => self.emit_not(term, env, writer),
-            AST::Add { left, right } => self.emit_add(left, right, env, writer),
-            AST::Subtract { left, right } => self.emit_subtract(left, right, env, writer),
-            AST::Multiply { left, right } => self.emit_multiply(left, right, env, writer),
-            AST::Divide { left, right } => self.emit_divide(left, right, env, writer),
-            AST::Equal { left, right } => self.emit_equal(left, right, env, writer),
-            AST::NotEqual { left, right } => self.emit_not_equal(left, right, env, writer),
-            AST::Block(statements) => self.emit_block(statements, env, writer),
-            AST::Call { args, callee } => self.emit_call(args, callee, env, writer),
+            AST::Main(statements) => self.emit_main(statements, writer),
+            AST::Assert(condition) => self.emit_assert(condition, writer),
+            AST::Number(number) => self.emit_number(number, writer),
+            AST::Not(term) => self.emit_not(term, writer),
+            AST::Add { left, right } => self.emit_add(left, right, writer),
+            AST::Subtract { left, right } => self.emit_subtract(left, right, writer),
+            AST::Multiply { left, right } => self.emit_multiply(left, right, writer),
+            AST::Divide { left, right } => self.emit_divide(left, right, writer),
+            AST::Equal { left, right } => self.emit_equal(left, right, writer),
+            AST::NotEqual { left, right } => self.emit_not_equal(left, right, writer),
+            AST::Block(statements) => self.emit_block(statements, writer),
+            AST::Call { args, callee } => self.emit_call(args, callee, writer),
             AST::Function {
                 name,
                 parameters,
                 body,
-            } => self.emit_function(name, parameters, body, env, writer),
+            } => self.emit_function(name, parameters, body, writer),
             AST::IfNode {
                 conditional,
                 consequence,
                 alternative,
-            } => self.emit_ifnode(conditional, consequence, alternative, env, writer),
-            AST::Return { term } => self.emit_return(term, env, writer),
-            AST::Id(name) => self.emit_idnode(name, env, writer),
+            } => self.emit_ifnode(conditional, consequence, alternative, writer),
+            AST::Return { term } => self.emit_return(term, writer),
+            AST::Id(name) => self.emit_idnode(name, writer),
 
-            AST::Return { term } => self.emit_return(term, env, writer),
+            AST::Return { term } => self.emit_return(term, writer),
 
             // AST::Function { .. } => {}
-            // AST::Var { .. } => {}
-            // AST::Assign { .. } => {}
+            AST::Var { name, value } => self.emit_var(name, value, writer),
+            AST::Assign { name, value } => self.emit_assign(name, value, writer),
             // AST::While { .. } => {}
             _ => {
                 writeln!(writer)
@@ -80,13 +75,8 @@ impl Backend for ArmBackend {
         // }
     }
 
-    fn emit_not(
-        &mut self,
-        term: &Box<AST>,
-        env: Option<&Environment>,
-        writer: &mut dyn Write,
-    ) -> std::io::Result<()> {
-        self.write(term, env, writer)?;
+    fn emit_not(&mut self, term: &Box<AST>, writer: &mut dyn Write) -> std::io::Result<()> {
+        self.write(term, writer)?;
         writeln!(
             writer,
             r#" cmp r0, #0
@@ -94,24 +84,14 @@ impl Backend for ArmBackend {
     movne r0, #0"#
         )
     }
-    fn emit_number(
-        &mut self,
-        number: &u64,
-        _env: Option<&Environment>,
-        writer: &mut dyn Write,
-    ) -> std::io::Result<()> {
+    fn emit_number(&mut self, number: &u64, writer: &mut dyn Write) -> std::io::Result<()> {
         writeln!(writer, "\tldr r0, ={}", number)
     }
 
     ///
     ///
-    fn emit_assert(
-        &mut self,
-        condition: &AST,
-        env: Option<&Environment>,
-        writer: &mut dyn Write,
-    ) -> std::io::Result<()> {
-        self.write(condition, env, writer)?;
+    fn emit_assert(&mut self, condition: &AST, writer: &mut dyn Write) -> std::io::Result<()> {
+        self.write(condition, writer)?;
         write!(writer, "\t")?;
         writeln!(
             writer,
@@ -127,29 +107,19 @@ impl Backend for ArmBackend {
     ///
     ///
     ///
-    fn emit_main(
-        &mut self,
-        statements: &Vec<AST>,
-        env: Option<&Environment>,
-        writer: &mut dyn Write,
-    ) -> std::io::Result<()> {
+    fn emit_main(&mut self, statements: &Vec<AST>, writer: &mut dyn Write) -> std::io::Result<()> {
         writeln!(writer, ".global main")?;
         writeln!(writer, "main:")?;
         writeln!(writer, "\tpush {{fp, lr}}")?;
         for statement in statements {
-            self.write(statement, env, writer)?;
+            self.write(statement, writer)?;
         }
         writeln!(writer, "\tmov r0, #0")?;
         writeln!(writer, "\tpop {{fp, pc}}")
     }
-    fn emit_block(
-        &mut self,
-        statements: &Vec<AST>,
-        env: Option<&Environment>,
-        writer: &mut dyn Write,
-    ) -> std::io::Result<()> {
+    fn emit_block(&mut self, statements: &Vec<AST>, writer: &mut dyn Write) -> std::io::Result<()> {
         for statement in statements {
-            self.write(statement, env, writer)?;
+            self.write(statement, writer)?;
         }
         Ok(())
     }
@@ -157,32 +127,26 @@ impl Backend for ArmBackend {
         &mut self,
         left: &Box<AST>,
         right: &Box<AST>,
-        env: Option<&Environment>,
+
         writer: &mut dyn Write,
     ) -> std::io::Result<()> {
-        self.emit_infix_operands(left, right, env, writer);
+        self.emit_infix_operands(left, right, writer);
         writeln!(writer, "\tadd r0, r1, r0")
     }
-    fn emit_infix_operands(
-        &mut self,
-        left: &Box<AST>,
-        right: &Box<AST>,
-        env: Option<&Environment>,
-        writer: &mut dyn Write,
-    ) {
-        self.write(left, env, writer).unwrap();
+    fn emit_infix_operands(&mut self, left: &Box<AST>, right: &Box<AST>, writer: &mut dyn Write) {
+        self.write(left, writer).unwrap();
         writeln!(writer, "\tpush {{r0, ip}}").unwrap();
-        self.write(right, env, writer).unwrap();
+        self.write(right, writer).unwrap();
         writeln!(writer, "\tpop {{r1, ip}}").unwrap();
     }
     fn emit_subtract(
         &mut self,
         left: &Box<AST>,
         right: &Box<AST>,
-        env: Option<&Environment>,
+
         writer: &mut dyn Write,
     ) -> std::io::Result<()> {
-        self.emit_infix_operands(left, right, env, writer);
+        self.emit_infix_operands(left, right, writer);
         writeln!(writer, "\tsub r0, r1, r0")
     }
 
@@ -190,10 +154,10 @@ impl Backend for ArmBackend {
         &mut self,
         left: &Box<AST>,
         right: &Box<AST>,
-        env: Option<&Environment>,
+
         writer: &mut dyn Write,
     ) -> std::io::Result<()> {
-        self.emit_infix_operands(left, right, env, writer);
+        self.emit_infix_operands(left, right, writer);
         writeln!(writer, "\tudiv r0, r0, r1")
     }
 
@@ -201,10 +165,10 @@ impl Backend for ArmBackend {
         &mut self,
         left: &Box<AST>,
         right: &Box<AST>,
-        env: Option<&Environment>,
+
         writer: &mut dyn Write,
     ) -> std::io::Result<()> {
-        self.emit_infix_operands(left, right, env, writer);
+        self.emit_infix_operands(left, right, writer);
         writeln!(writer, "\tmul r0, r0, r1")
     }
 
@@ -212,10 +176,10 @@ impl Backend for ArmBackend {
         &mut self,
         left: &Box<AST>,
         right: &Box<AST>,
-        env: Option<&Environment>,
+
         writer: &mut dyn Write,
     ) -> std::io::Result<()> {
-        self.emit_infix_operands(left, right, env, writer);
+        self.emit_infix_operands(left, right, writer);
         write!(writer, "\t")?;
         writeln!(
             writer,
@@ -229,10 +193,10 @@ impl Backend for ArmBackend {
         &mut self,
         left: &Box<AST>,
         right: &Box<AST>,
-        env: Option<&Environment>,
+
         writer: &mut dyn Write,
     ) -> std::io::Result<()> {
-        self.emit_infix_operands(left, right, env, writer);
+        self.emit_infix_operands(left, right, writer);
         write!(writer, "\t")?;
         writeln!(
             writer,
@@ -246,14 +210,14 @@ impl Backend for ArmBackend {
         &mut self,
         args: &Vec<AST>,
         callee: &String,
-        env: Option<&Environment>,
+
         writer: &mut dyn Write,
     ) -> std::io::Result<()> {
         let len = args.len();
         if args.is_empty() {
             writeln!(writer, "\tbl {}", callee)
         } else if len == 1 {
-            self.write(args.first().unwrap(), env, writer);
+            self.write(args.first().unwrap(), writer);
             writeln!(writer, "\tbl {}", callee)
         } else if (2..=4).contains(&len) {
             // allocate enough stack space for up to four arguments (16 bytes)
@@ -262,7 +226,7 @@ impl Backend for ArmBackend {
             // lower.
             writeln!(writer, "\tsub sp, sp, #16")?;
             args.iter().enumerate().for_each(|(i, arg)| {
-                self.write(arg, env, writer).expect("Write failed");
+                self.write(arg, writer).expect("Write failed");
                 // We multiply by four to convert array indexes 0, 1, 2, 3 into
                 // stack offsets in bytes: 0, 4, 8, 12.
                 writeln!(writer, "\tstr r0, [sp, #{}]", 4 * i).expect("Write failed");
@@ -279,7 +243,6 @@ impl Backend for ArmBackend {
         name: &String,
         parameters: &Vec<String>,
         body: &Box<AST>,
-        _: Option<&Environment>,
         writer: &mut dyn Write,
     ) -> std::io::Result<()> {
         if parameters.len() > 4 {
@@ -289,6 +252,7 @@ impl Backend for ArmBackend {
         writeln!(writer, ".global {}", name)?;
         writeln!(writer, "{}:", name)?;
         self.emit_fn_prologue(writer)?;
+
         let mut locals: HashMap<String, isize> = HashMap::new();
         for (i, parameter) in parameters.iter().enumerate() {
             locals.insert(parameter.clone(), 4 * i as isize - 16);
@@ -297,7 +261,9 @@ impl Backend for ArmBackend {
             locals,
             next_local_offset: -20,
         };
-        self.write(body, Some(&env), writer)?;
+        self.env.push_back(env);
+        self.write(body, writer)?;
+        self.env.pop_back();
         self.emit_fn_epilogue(writer)
     }
 
@@ -306,54 +272,66 @@ impl Backend for ArmBackend {
         conditional: &Box<AST>,
         consequence: &Box<AST>,
         alternative: &Box<AST>,
-        env: Option<&Environment>,
+
         writer: &mut dyn Write,
     ) -> std::io::Result<()> {
         let if_false_label = self.new_label();
         let end_if_label = self.new_label();
-        self.write(conditional, env, writer)?;
+        self.write(conditional, writer)?;
         writeln!(writer, "\tcmp r0, #0")?;
         writeln!(writer, "\tbeq {}", if_false_label)?;
-        self.write(consequence, env, writer)?;
+        self.write(consequence, writer)?;
         writeln!(writer, "\tb {}", end_if_label)?;
         writeln!(writer, "{}:", if_false_label)?;
-        self.write(alternative, env, writer)?;
+        self.write(alternative, writer)?;
         writeln!(writer, "{}:", end_if_label)
     }
 
-    fn emit_idnode(
-        &mut self,
-        name: &String,
-        env: Option<&Environment>,
-        writer: &mut dyn Write,
-    ) -> std::io::Result<()> {
+    fn emit_idnode(&mut self, name: &String, writer: &mut dyn Write) -> std::io::Result<()> {
+        let env = self.env.iter().last().expect("Missing environment");
         let offset = env
-            .expect("Missing environment")
             .locals
             .get(name)
             .unwrap_or_else(|| panic!("Undefined variable: {}", name));
         writeln!(writer, "\tldr r0, [fp, #{}]", offset)
     }
 
-    fn emit_return(
-        &mut self,
-        term: &Box<AST>,
-        env: Option<&Environment>,
-        writer: &mut dyn Write,
-    ) -> std::io::Result<()> {
-        self.write(term, env, writer)?;
+    fn emit_return(&mut self, term: &Box<AST>, writer: &mut dyn Write) -> std::io::Result<()> {
+        self.write(term, writer)?;
         writeln!(writer, "\tmov sp, fp")?;
         writeln!(writer, "\tpop {{fp, pc}}")
     }
-
+    fn emit_assign(
+        &mut self,
+        name: &String,
+        value: &Box<AST>,
+        writer: &mut dyn Write,
+    ) -> std::io::Result<()> {
+        self.write(value, writer)?;
+        let env = self.env.iter().last().expect("Missing environment");
+        let offset = env
+            .locals
+            .get(name)
+            .unwrap_or_else(|| panic!("Undefined variable: {}", name));
+        writeln!(writer, "\tstr r0, [fp, #{}]", offset)
+    }
     fn emit_var(
         &mut self,
-        _name: &String,
-        _value: &Box<AST>,
-        _env: &mut Environment,
-        _writer: &mut dyn Write,
+        name: &String,
+        value: &Box<AST>,
+        writer: &mut dyn Write,
     ) -> std::io::Result<()> {
-        todo!()
+        self.write(value, writer)?;
+        writeln!(writer, "\tpush {{r0, ip}}");
+        let mut env = self.env.pop_back().expect("Missing environment");
+
+        env.locals
+            .insert(name.to_string(), env.next_local_offset - 4);
+        env.next_local_offset -= 8;
+        self.env.push_back(env);
+        Ok(())
+        // env.locals.set(this.name, env.nextLocalOffset - 4);
+        // env.nextLocalOffset -= 8
     }
 
     fn new_label(&mut self) -> String {
@@ -377,8 +355,15 @@ mod tests {
     }
 
     fn compile_and_run(code: &str) -> Result<Output, CompileError> {
+        let mut env = LinkedList::new();
+        env.push_back(Environment {
+            locals: HashMap::new(),
+            next_local_offset: 0,
+        });
+
         let mut arm_code = ArmBackend {
-            ..Default::default()
+            label_counter: 0,
+            env,
         };
 
         let file_base_name = format!("tmp/test_{:x}", md5::compute(code));
@@ -389,10 +374,6 @@ mod tests {
         arm_code
             .write(
                 &ast,
-                Option::Some(&mut Environment {
-                    locals,
-                    next_local_offset: 0,
-                }),
                 &mut File::create(format!("{}.s", file_base_name)).expect("Open file failed"),
             )
             .map_err(CompileError::IOError)
@@ -459,7 +440,7 @@ mod tests {
                 }
             }"#,
         )
-            .expect("TODO: panic message");
+        .expect("TODO: panic message");
     }
 
     #[test]
@@ -469,7 +450,7 @@ mod tests {
                 assert(0);
             }"#,
         )
-            .expect("Compile an run failed");
+        .expect("Compile an run failed");
 
         assert_eq!("F".to_string(), String::from_utf8(result.stdout).unwrap());
 
@@ -478,7 +459,7 @@ mod tests {
                 assert(1);
             }"#,
         )
-            .expect("Compile an run failed");
+        .expect("Compile an run failed");
 
         assert_eq!("T".to_string(), String::from_utf8(result.stdout).unwrap());
     }
@@ -499,7 +480,7 @@ mod tests {
                 assert(42 == 42);
             }"#,
         )
-            .expect("Compile an run failed");
+        .expect("Compile an run failed");
 
         assert_eq!("T".to_string(), String::from_utf8(result.stdout).unwrap());
 
@@ -508,7 +489,7 @@ mod tests {
                 assert(42 == 11111);
             }"#,
         )
-            .expect("Compile an run failed");
+        .expect("Compile an run failed");
 
         assert_eq!(
             "F".to_string(),
@@ -523,7 +504,7 @@ mod tests {
                 assert(42 == 4 + 2 * (12 - 2) + 3 * (5 + 1));
             }"#,
         )
-            .expect("Compile an run failed");
+        .expect("Compile an run failed");
 
         assert_eq!("T".to_string(), String::from_utf8(result.stdout).unwrap());
     }
@@ -535,7 +516,7 @@ mod tests {
                 assert(2==3-1);
             }"#,
         )
-            .expect("Compile an run failed");
+        .expect("Compile an run failed");
 
         assert_eq!("T".to_string(), String::from_utf8(result.stdout).unwrap());
     }
@@ -547,7 +528,7 @@ mod tests {
                 assert(6 == 4 + (3-1) );
             }"#,
         )
-            .expect("Compile an run failed");
+        .expect("Compile an run failed");
 
         assert_eq!("T".to_string(), String::from_utf8(result.stdout).unwrap());
     }
@@ -671,7 +652,7 @@ mod tests {
     fn factorial() {
         let result = compile_and_run(
             r#"function main() {
-                    assert(factorial(5) == 120);
+                    assert(factorial(6) == 720);
             }
            function factorial(n) {
                 if (n == 0) {
@@ -681,19 +662,32 @@ mod tests {
                 }
            }
             "#,
-        ).expect("Compile an run failed");
+        )
+        .expect("Compile an run failed");
 
         assert_eq!("T".to_string(), String::from_utf8(result.stdout).unwrap());
     }
 
     #[test]
-    fn factorial_lite() {
+    fn local_var() {
         compile_and_run(
             r#"function main() {
                     var x = 1;
                     var y = 2;
                     var z = x + y;
                     assert(z == 3);
+            }
+            "#,
+        );
+    }
+    #[test]
+    fn assign_local_var() {
+        compile_and_run(
+            r#"function main() {
+                    var a = 1;
+                    assert(a == 1);
+                    a = 0;
+                    assert(a == 0);
             }
             "#,
         );
