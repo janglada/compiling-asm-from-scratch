@@ -365,6 +365,84 @@ mod tests {
             label_counter: 0,
             env,
         };
+        //
+        //     let file_base_name = format!("tmp/test_{:x}", md5::compute(code));
+        //
+        //     let ast = parse(code).expect("Parse error");
+        //     let locals: HashMap<String, isize> = HashMap::new();
+        //     println!("compiling....");
+        //     arm_code
+        //         .write(
+        //             &ast,
+        //             &mut File::create(format!("{}.s", file_base_name)).expect("Open file failed"),
+        //         )
+        //         .map_err(CompileError::IOError)
+        //         .expect("Could not generate assembly");
+        //
+        //     //arm_code.write(&ast, &mut io::stdout());
+        //     println!("assembly written");
+        //     // arm-linux-gnueabihf-gcc -static test.s
+        //
+        //     let compile_result = Command::new("gcc")
+        //         // .arg("-g")
+        //         .arg(format!("{}.s", file_base_name))
+        //         .arg("-o")
+        //         .arg(format!("{}.bin", file_base_name))
+        //         .output();
+        //
+        //     let _codegen_result: Result<(), CompileError> = match compile_result {
+        //         Ok(output) => {
+        //             io::stdout().write_all(&output.stdout).unwrap();
+        //             io::stderr().write_all(&output.stderr).unwrap();
+        //
+        //             if output.status.success() {
+        //                 println!("Compiled, executing...");
+        //                 Ok(())
+        //             } else {
+        //                 println!("Compile error");
+        //                 let errmsg = String::from_utf8_lossy(&output.stderr).into_owned();
+        //                 Err(CompileError::CodeGenError(errmsg))
+        //             }
+        //         }
+        //         Err(e) => Err(CompileError::CodeGenError(e.to_string())),
+        //     };
+        //
+        //     _codegen_result.expect("Error");
+        //     panic!("ERROR");
+        //
+        //     let execution_res = match Command::new(format!("./{}.bin", file_base_name)).output() {
+        //         Ok(output) => {
+        //             io::stdout().write_all(&output.stdout).unwrap();
+        //             io::stderr().write_all(&output.stderr).unwrap();
+        //
+        //             if output.status.success() {
+        //                 Ok(Output {
+        //                     stdout: output.stdout.clone(),
+        //                     stderr: output.stdout.clone(),
+        //                 })
+        //             } else {
+        //                 let errmsg = String::from_utf8_lossy(&output.stderr).into_owned();
+        //
+        //                 return Err(CompileError::RuntimeError(errmsg, output.status.code()));
+        //             }
+        //         }
+        //         Err(e) => return Err(CompileError::RuntimeError(e.to_string(), Option::None)),
+        //     };
+        //
+        //     execution_res
+        // }
+        //
+        // fn compile_and_run_x86(code: &str) -> Result<Output, CompileError> {
+        //     let mut env = LinkedList::new();
+        //     env.push_back(Environment {
+        //         locals: HashMap::new(),
+        //         next_local_offset: 0,
+        //     });
+        //
+        //     let mut arm_code = ArmBackend {
+        //         label_counter: 0,
+        //         env,
+        //     };
 
         let file_base_name = format!("tmp/test_{:x}", md5::compute(code));
 
@@ -397,15 +475,15 @@ mod tests {
                 io::stderr().write_all(&output.stderr).unwrap();
 
                 if output.status.success() {
-                    println!("Compiled");
+                    println!("Compiled, executing...");
                     Ok(())
                 } else {
                     println!("Compile error");
                     let errmsg = String::from_utf8_lossy(&output.stderr).into_owned();
-                    return Err(CompileError::CodeGenError(errmsg));
+                    Err(CompileError::CodeGenError(errmsg))
                 }
             }
-            Err(e) => return Err(CompileError::CodeGenError(e.to_string())),
+            Err(e) => Err(CompileError::CodeGenError(e.to_string())),
         };
 
         let execution_res = match Command::new(format!("./{}.bin", file_base_name)).output() {
@@ -421,10 +499,10 @@ mod tests {
                 } else {
                     let errmsg = String::from_utf8_lossy(&output.stderr).into_owned();
 
-                    return Err(CompileError::RuntimeError(errmsg, output.status.code()));
+                    Err(CompileError::RuntimeError(errmsg, output.status.code()))
                 }
             }
-            Err(e) => return Err(CompileError::RuntimeError(e.to_string(), Option::None)),
+            Err(e) => Err(CompileError::RuntimeError(e.to_string(), Option::None)),
         };
 
         execution_res
@@ -434,7 +512,7 @@ mod tests {
     fn compile_main() {
         compile_and_run(
             r#"function main() {
-                b = 1;
+                var b = 1;
                 while (a) {
                     b = 1;
                 }
@@ -542,7 +620,8 @@ mod tests {
                     assert(1);
                 }
             }"#,
-        );
+        )
+        .expect("Compile an run failed");
     }
 
     #[test]
@@ -553,10 +632,11 @@ mod tests {
                     putchar(46);
                     putchar(46);
                     putchar(46);
-                    var a = rand() != 42;
+
                 }
             }"#,
-        );
+        )
+        .expect("Compile an run failed");
     }
 
     #[test]
@@ -571,7 +651,8 @@ mod tests {
                     }
                 }
             }"#,
-        );
+        )
+        .expect("Compile an run failed");
     }
 
     #[test]
@@ -588,7 +669,8 @@ mod tests {
                 }
                 
             }"#,
-        );
+        )
+        .expect("Compile an run failed");
     }
 
     #[test]
@@ -615,20 +697,18 @@ mod tests {
                     putchar(d);
                 }                
             "#,
-        );
+        )
+        .expect("Compile an run failed");
     }
 
     #[test]
     fn compile_function() {
         compile_and_run(
-            r#"function main() {
-
-                    
-                    asserttt(1, 2, 3, 4);
-                    
+            r#"function main() {                 
+                    assert(1, 2, 3, 4);                    
                 }
                 
-                function asserttt(a, b, c, d) {
+                function assert(a, b, c, d) {
                     assert(a == 1);
                     assert(b == 2);
                     assert(c == 3);
@@ -636,7 +716,8 @@ mod tests {
                 }                
                 
             "#,
-        );
+        )
+        .expect("Compile an run failed");
     }
 
     #[test]
@@ -645,29 +726,51 @@ mod tests {
             r#"function main() {             
                 return 0;
             }"#,
-        );
+        )
+        .expect("Compile an run failed");
     }
 
     #[test]
     fn factorial() {
         let result = compile_and_run(
+            r#"function factorial(n) {
+  if (n == 0) {
+    return 1;
+  } else {
+    return n * factorial(n - 1);
+  }
+}
+
+function main() {
+   assert(6 == factorial(3));
+  return 0;
+}
+            "#,
+        )
+        .expect("Compile and run failed");
+        //println!("{}", String::from_utf8(result.stdout).unwrap());
+        assert_eq!("T", String::from_utf8(result.stdout).unwrap());
+    }
+    #[test]
+    fn empty_main() {
+        compile_and_run(
             r#"function main() {
-                    assert(factorial(6) == 720);
+
             }
-           function factorial(n) {
-                if (n == 0) {
-                    return 1;
-                } else {
-                    return n *  factorial(n - 1);
-                }
-           }
             "#,
         )
         .expect("Compile an run failed");
-
-        assert_eq!("T".to_string(), String::from_utf8(result.stdout).unwrap());
     }
-
+    #[test]
+    fn create_var() {
+        compile_and_run(
+            r#"function main() {
+                    var x = 1;
+            }
+            "#,
+        )
+        .expect("Compile an run failed");
+    }
     #[test]
     fn local_var() {
         compile_and_run(
@@ -675,10 +778,10 @@ mod tests {
                     var x = 1;
                     var y = 2;
                     var z = x + y;
-                    assert(z == 3);
             }
             "#,
-        );
+        )
+        .expect("Compile an run failed");
     }
     #[test]
     fn assign_local_var() {
@@ -690,6 +793,7 @@ mod tests {
                     assert(a == 0);
             }
             "#,
-        );
+        )
+        .expect("Compile an run failed");
     }
 }

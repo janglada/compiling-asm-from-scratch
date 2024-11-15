@@ -1,8 +1,6 @@
 use crate::ast::AST;
 use crate::error::CompileError;
 
-
-
 peg::parser! {
   pub grammar lang_parser() for str {
 
@@ -83,7 +81,7 @@ peg::parser! {
 
     /// alow whitespaces before after
     pub rule expression() -> AST = _ e:expressionPrecedence() _ {e }
-        
+
     pub rule expressionPrecedence() -> AST = precedence!{
         x:(@) _ "==" _ y:@ { AST::Equal{left:x.into(), right:y.into()} }
         x:(@) _ "!=" _ y:@ { AST::NotEqual{left:x.into(), right:y.into()} }
@@ -98,7 +96,7 @@ peg::parser! {
         --
         "(" _ v:expression() _ ")" { v }
         n :atom() {n}
-    }        
+    }
 
     ///
     /// Statements
@@ -172,7 +170,7 @@ peg::parser! {
             =  FUNCTION() _ id: Id() _ "(" _ p: parameters() _ ")" _ body:blockStmt() _ {
             if let AST::Id(name) = id {
 
-                if name == "main" {
+                if false && name == "main" {
                   if let AST::Block(statements) = body {
                     AST::Main(statements)
                   } else {
@@ -239,7 +237,6 @@ pub fn parse(input: &str) -> Result<AST, CompileError> {
 mod tests {
     use super::*;
 
-
     #[test]
     fn number() {
         assert_eq!(
@@ -272,7 +269,7 @@ mod tests {
                 left: 3.into(),
                 right: 2.into(),
             }
-                .into(),
+            .into(),
         };
         println!("{}", expected_ast);
         assert_eq!(
@@ -289,7 +286,7 @@ mod tests {
                 left: "b".to_string().into(),
                 right: "c".to_string().into(),
             }
-                .into(),
+            .into(),
         };
         println!("{}", expected_ast);
         assert_eq!(
@@ -305,7 +302,7 @@ mod tests {
                 left: 1.into(),
                 right: 3.into(),
             }
-                .into(),
+            .into(),
             right: 2.into(),
         };
         println!("{}", expected_ast);
@@ -347,14 +344,14 @@ mod tests {
 
     #[test]
     fn substract_and_equal() {
-        let expected_ast =
-            AST::Equal {
-                left: 2.into(),
-                right: AST::Subtract {
-                    left: 3.into(),
-                    right: 1.into(),
-                }.into(),
-            };
+        let expected_ast = AST::Equal {
+            left: 2.into(),
+            right: AST::Subtract {
+                left: 3.into(),
+                right: 1.into(),
+            }
+            .into(),
+        };
         println!("{}", expected_ast);
         assert_eq!(
             expected_ast,
@@ -387,22 +384,22 @@ mod tests {
                             left: 12.into(),
                             right: 2.into(),
                         }
-                            .into(),
-                    }
                         .into(),
-                }
+                    }
                     .into(),
+                }
+                .into(),
                 right: AST::Multiply {
                     left: 3.into(),
                     right: AST::Add {
                         left: 5.into(),
                         right: 1.into(),
                     }
-                        .into(),
-                }
                     .into(),
-            }
+                }
                 .into(),
+            }
+            .into(),
         };
         println!("{}", expected_ast);
 
@@ -438,12 +435,12 @@ mod tests {
                 left: 1.into(),
                 right: 1.into(),
             }
-                .into(),
+            .into(),
             right: AST::Subtract {
                 left: 2.into(),
                 right: 1.into(),
             }
-                .into(),
+            .into(),
         };
         println!("{}", expected_ast);
         assert_eq!(
@@ -461,9 +458,10 @@ mod tests {
                 right: AST::Subtract {
                     left: 3.into(),
                     right: 1.into(),
-                }.into(),
-            }
+                }
                 .into(),
+            }
+            .into(),
         };
         println!("{}", expected_ast);
         assert_eq!(
@@ -471,7 +469,6 @@ mod tests {
             lang_parser::expression("6 == 4 + (3-1) ").expect("Parser failed")
         )
     }
-
 
     #[test]
     fn call_simple() {
@@ -560,7 +557,6 @@ mod tests {
         );
     }
 
-
     #[test]
     fn assign() {
         let expected_ast = AST::Assign {
@@ -594,13 +590,15 @@ mod tests {
                 value: AST::Add {
                     left: AST::Id("x".into()).into(),
                     right: AST::Id("y".into()).into(),
-                }.into(),
+                }
+                .into(),
             },
             AST::Assert(
                 AST::Equal {
                     left: AST::Id("z".into()).into(),
                     right: AST::Number(3).into(),
-                }.into()
+                }
+                .into(),
             ),
         ]);
         println!("{}", expected_ast);
@@ -614,7 +612,7 @@ mod tests {
                      assert(z == 3);
              }"#
             )
-                .expect("Parser failed")
+            .expect("Parser failed")
         );
     }
 
@@ -626,7 +624,7 @@ mod tests {
                 left: AST::Number(1).into(),
                 right: AST::Number(1).into(),
             }
-                .into(),
+            .into(),
         };
         println!("{}", expected_ast);
         assert_eq!(
@@ -664,7 +662,7 @@ mod tests {
                 var b = 2;
              }"#
             )
-                .expect("Parser failed")
+            .expect("Parser failed")
         );
     }
 
@@ -690,7 +688,7 @@ mod tests {
                     }
              }"#
             )
-                .expect("Parser failed")
+            .expect("Parser failed")
         );
     }
 
@@ -723,7 +721,7 @@ mod tests {
                 
             }"#,
             )
-                .expect("Parser failed")
+            .expect("Parser failed")
         );
     }
 
@@ -735,12 +733,12 @@ mod tests {
                 name: "a".to_string(),
                 value: AST::Number(1).into(),
             }])
-                .into(),
+            .into(),
             alternative: AST::Block(vec![AST::Assign {
                 name: "a".to_string(),
                 value: AST::Number(0).into(),
             }])
-                .into(),
+            .into(),
         };
 
         println!("{}", expected_ast);
@@ -753,7 +751,7 @@ mod tests {
                 a = 0;
             }"#
             )
-                .expect("Parser failed")
+            .expect("Parser failed")
         );
     }
 
@@ -771,7 +769,7 @@ mod tests {
                     value: AST::Number(2).into(),
                 },
             ])
-                .into(),
+            .into(),
         };
 
         println!("{}", expected_ast);
@@ -783,7 +781,7 @@ mod tests {
                 a = 2;
             }"#
             )
-                .expect("Parser failed")
+            .expect("Parser failed")
         );
     }
 
@@ -802,13 +800,13 @@ mod tests {
                         name: "b".to_string(),
                         value: AST::Number(1).into(),
                     }])
-                        .into(),
+                    .into(),
                 },
                 AST::Return {
                     term: AST::Id("a".to_string()).into(),
                 },
             ])
-                .into(),
+            .into(),
             parameters: vec![String::from("a"), String::from("b")],
         };
 
@@ -824,7 +822,43 @@ mod tests {
                 return a;
             }"#
             )
-                .expect("Parser failed")
+            .expect("Parser failed")
+        );
+    }
+    #[test]
+    fn main_func() {
+        let expected_ast = AST::Function {
+            name: "main".to_string(),
+            body: AST::Block(vec![AST::Var {
+                name: "x".to_string(),
+                value: AST::Number(1).into(),
+            }
+            .into()])
+            .into(),
+            parameters: vec![],
+        };
+
+        // let expected_ast = AST::Main(vec![AST::Var {
+        //     name: "x".to_string(),
+        //     value: AST::Number(1).into(),
+        // }]);
+
+        let ast = lang_parser::parser(
+            r#"function main() {
+var x = 1;
+}"#,
+        )
+        .expect("Parser failed");
+
+        println!("{}", expected_ast);
+        assert_eq!(
+            expected_ast,
+            lang_parser::parser(
+                r#"    function main() {
+var x = 1;
+}"#
+            )
+            .expect("Parser failed")
         );
     }
 
@@ -844,7 +878,7 @@ mod tests {
                         left: AST::Id(String::from("n")).into(),
                         right: AST::Number(1).into(),
                     }
-                        .into(),
+                    .into(),
                     body: AST::Block(vec![
                         AST::Assign {
                             name: "result".to_string(),
@@ -852,7 +886,7 @@ mod tests {
                                 left: AST::Id(String::from("result")).into(),
                                 right: AST::Id(String::from("n")).into(),
                             }
-                                .into(),
+                            .into(),
                         },
                         AST::Assign {
                             name: "n".to_string(),
@@ -860,16 +894,16 @@ mod tests {
                                 left: AST::Id(String::from("n")).into(),
                                 right: AST::Number(1).into(),
                             }
-                                .into(),
+                            .into(),
                         },
                     ])
-                        .into(),
+                    .into(),
                 },
                 AST::Return {
                     term: AST::Id("result".to_string()).into(),
                 },
             ])
-                .into(),
+            .into(),
         };
 
         println!("{}", expected_ast);
@@ -885,7 +919,7 @@ mod tests {
     return result; 
 }"#
             )
-                .expect("Parser failed")
+            .expect("Parser failed")
         );
     }
 
@@ -902,7 +936,7 @@ mod tests {
                     name: "b".to_string(),
                     value: AST::Number(1).into(),
                 }])
-                    .into(),
+                .into(),
             },
         ]);
 
@@ -917,7 +951,7 @@ mod tests {
                 }
             }"#
             )
-                .expect("Parser failed")
+            .expect("Parser failed")
         );
     }
 
@@ -935,7 +969,7 @@ mod tests {
                     name: "b".into(),
                     value: 1.into(),
                 }])
-                    .into(),
+                .into(),
             },
         ]);
         println!("{}", expected_ast);
@@ -952,7 +986,7 @@ mod tests {
             }
             "#
             )
-                .expect("Parser failed")
+            .expect("Parser failed")
         );
     }
 }
