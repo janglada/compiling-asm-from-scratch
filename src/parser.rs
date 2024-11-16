@@ -170,20 +170,21 @@ peg::parser! {
             =  FUNCTION() _ id: Id() _ "(" _ p: parameters() _ ")" _ body:blockStmt() _ {
             if let AST::Id(name) = id {
 
-                if false && name == "main" {
-                  if let AST::Block(statements) = body {
-                    AST::Main(statements)
-                  } else {
-                        unreachable!()
-                   }
-                } else {
+                // if false && name == "main" {
+                //   if let AST::Block(statements) = body {
+                //     AST::Main(statements)
+                //   } else {
+                //         unreachable!()
+                //    }
+                // } else {
 
                     AST::Function {
                         name,
                         parameters: p,
                         body: body.into()
                     }
-                }
+                //}
+
 
             } else {
                  unreachable!()
@@ -668,14 +669,20 @@ mod tests {
 
     #[test]
     fn block_stmt_within_main() {
-        let expected_ast = AST::Main(vec![AST::Block(vec![
-            AST::Assert(1.into()),
-            AST::Assert(1.into()),
-            AST::Call {
-                callee: "putchar".into(),
-                args: vec![AST::Number(84)],
-            },
-        ])]);
+        let expected_ast = AST::Function {
+            name: "main".to_string(),
+            parameters: vec![],
+            body: AST::Block(vec![AST::Block(vec![
+                AST::Assert(1.into()),
+                AST::Assert(1.into()),
+                AST::Call {
+                    callee: "putchar".into(),
+                    args: vec![AST::Number(84)],
+                },
+            ])])
+            .into(),
+        };
+
         println!("{}", expected_ast);
         assert_eq!(
             expected_ast,
@@ -694,17 +701,23 @@ mod tests {
 
     #[test]
     fn block_stmt_within_main2() {
-        let expected_ast = AST::Main(vec![AST::Block(vec![
-            AST::IfNode {
-                conditional: 0.into(),
-                consequence: AST::Block(vec![AST::Assert(0.into())]).into(),
-                alternative: AST::Block(vec![AST::Assert(1.into())]).into(),
-            },
-            AST::Call {
-                callee: "putchar".into(),
-                args: vec![AST::Number(84)],
-            },
-        ])]);
+        let expected_ast = AST::Function {
+            name: "main".to_string(),
+            parameters: vec![],
+            body: AST::Block(vec![AST::Block(vec![
+                AST::IfNode {
+                    conditional: 0.into(),
+                    consequence: AST::Block(vec![AST::Assert(0.into())]).into(),
+                    alternative: AST::Block(vec![AST::Assert(1.into())]).into(),
+                },
+                AST::Call {
+                    callee: "putchar".into(),
+                    args: vec![AST::Number(84)],
+                },
+            ])])
+            .into(),
+        };
+
         println!("{}", expected_ast);
         assert_eq!(
             expected_ast,
@@ -925,20 +938,25 @@ var x = 1;
 
     #[test]
     fn main_stmt() {
-        let expected_ast = AST::Main(vec![
-            AST::Assign {
-                name: "b".to_string(),
-                value: AST::Number(1).into(),
-            },
-            AST::While {
-                conditional: AST::Id("a".into()).into(),
-                body: AST::Block(vec![AST::Assign {
+        let expected_ast = AST::Function {
+            name: "main".to_string(),
+            parameters: vec![],
+            body: AST::Block(vec![
+                AST::Assign {
                     name: "b".to_string(),
                     value: AST::Number(1).into(),
-                }])
-                .into(),
-            },
-        ]);
+                },
+                AST::While {
+                    conditional: AST::Id("a".into()).into(),
+                    body: AST::Block(vec![AST::Assign {
+                        name: "b".to_string(),
+                        value: AST::Number(1).into(),
+                    }])
+                    .into(),
+                },
+            ])
+            .into(),
+        };
 
         println!("{}", expected_ast);
         assert_eq!(
@@ -958,10 +976,15 @@ var x = 1;
     #[test]
     fn main_and_other_stmt() {
         let expected_ast = AST::Block(vec![
-            AST::Main(vec![AST::Var {
-                name: "a".into(),
-                value: 1.into(),
-            }]),
+            AST::Function {
+                name: "main".to_string(),
+                parameters: vec![],
+                body: AST::Block(vec![AST::Var {
+                    name: "a".into(),
+                    value: 1.into(),
+                }])
+                .into(),
+            },
             AST::Function {
                 name: "other".into(),
                 parameters: vec![],
