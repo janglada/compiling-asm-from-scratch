@@ -797,6 +797,89 @@ mod tests {
             .expect("Parser failed")
         );
     }
+    #[test]
+    fn while_cond() {
+        let expected_ast = AST::Block(vec![
+            AST::Var {
+                name: "a".to_string(),
+                value: AST::Number(1).into(),
+            },
+            AST::While {
+                conditional: AST::NotEqual {
+                    left: AST::Id("a".to_string()).into(),
+                    right: AST::Number(10).into(),
+                }
+                .into(),
+                body: AST::Block(vec![AST::Assign {
+                    name: "a".to_string(),
+                    value: AST::Add {
+                        left: AST::Id("a".to_string()).into(),
+                        right: AST::Number(1).into(),
+                    }
+                    .into(),
+                }])
+                .into(),
+            },
+        ]);
+
+        println!("{}", expected_ast);
+        assert_eq!(
+            expected_ast,
+            lang_parser::parser(
+                r#"
+                var a = 1;
+                while(a != 10) {
+                a = a+1;
+            }"#
+            )
+            .expect("Parser failed")
+        );
+    }
+
+    #[test]
+    fn main_while_cond() {
+        let expected_ast = AST::Function {
+            name: "main".to_string(),
+            parameters: vec![],
+            body: AST::Block(vec![
+                AST::Var {
+                    name: "a".to_string(),
+                    value: AST::Number(1).into(),
+                },
+                AST::While {
+                    conditional: AST::NotEqual {
+                        left: AST::Id("a".to_string()).into(),
+                        right: AST::Number(10).into(),
+                    }
+                    .into(),
+                    body: AST::Block(vec![AST::Assign {
+                        name: "a".to_string(),
+                        value: AST::Add {
+                            left: AST::Id("a".to_string()).into(),
+                            right: AST::Number(1).into(),
+                        }
+                        .into(),
+                    }])
+                    .into(),
+                },
+            ])
+            .into(),
+        };
+
+        println!("{}", expected_ast);
+        assert_eq!(
+            expected_ast,
+            lang_parser::parser(
+                r#"function main() {
+                    var a = 1;
+                    while(a != 10) {
+                    a = a+1;
+                    }
+                }"#
+            )
+            .expect("Parser failed")
+        );
+    }
 
     #[test]
     fn function_stmt() {

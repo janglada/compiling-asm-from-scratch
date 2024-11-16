@@ -5,7 +5,7 @@ use std::io::Write;
 
 #[derive(Default)]
 struct ArmBackend {
-    label_counter: u16,
+    label_counter: i16,
     env: LinkedList<Environment>,
 }
 
@@ -61,6 +61,7 @@ impl Backend for ArmBackend {
             // AST::Function { .. } => {}
             AST::Var { name, value } => self.emit_var(name, value, writer),
             AST::Assign { name, value } => self.emit_assign(name, value, writer),
+            AST::While { conditional, body } => self.emit_while(conditional, body, writer),
             // AST::While { .. } => {}
             _ => {
                 writeln!(writer)
@@ -338,6 +339,23 @@ impl Backend for ArmBackend {
         self.label_counter += 1;
         format!(".L{}", self.label_counter)
     }
+
+    fn emit_while(
+        &mut self,
+        conditional: &Box<AST>,
+        body: &Box<AST>,
+        writer: &mut dyn Write,
+    ) -> std::io::Result<()> {
+        let loop_start = self.new_label();
+        let loop_end = self.new_label();
+        writeln!(writer, "{}:", loop_start)?;
+        self.write(conditional, writer)?;
+        writeln!(writer, "\tcmp r0, #0")?;
+        writeln!(writer, "\tbeq {}", loop_end)?;
+        self.write(body, writer)?;
+        writeln!(writer, "\tb {}", loop_start)?;
+        writeln!(writer, "{}:", loop_end)
+    }
 }
 
 #[cfg(test)]
@@ -362,7 +380,7 @@ mod tests {
         });
 
         let mut arm_code = ArmBackend {
-            label_counter: 0,
+            label_counter: -1,
             env,
         };
         //
@@ -513,12 +531,27 @@ mod tests {
         compile_and_run(
             r#"function main() {
                 var b = 1;
-                while (a) {
+                while (b) {
                     b = 1;
                 }
             }"#,
         )
         .expect("TODO: panic message");
+    }
+
+    #[test]
+    fn while_cond() {
+        let result = compile_and_run(
+            r#"function main() {
+                    var a = 1;
+                    while(a != 100) {
+                        a = a+1;
+                    }
+                    assert(a == 100);
+                }"#,
+        )
+        .expect("TODO: panic message");
+        assert_eq!("T".to_string(), String::from_utf8(result.stdout).unwrap());
     }
 
     #[test]

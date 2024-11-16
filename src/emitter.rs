@@ -104,4 +104,11 @@ pub trait Backend {
     ) -> std::io::Result<()>;
 
     fn new_label(&mut self) -> String;
+
+    fn emit_while(
+        &mut self,
+        conditional: &Box<AST>,
+        body: &Box<AST>,
+        writer: &mut dyn Write,
+    ) -> std::io::Result<()>;
 }
