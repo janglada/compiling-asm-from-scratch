@@ -31,6 +31,26 @@ pub enum AST {
         right: Box<AST>,
     },
 
+    LessThan {
+        left: Box<AST>,
+        right: Box<AST>,
+    },
+
+    GreaterThan {
+        left: Box<AST>,
+        right: Box<AST>,
+    },
+
+    LessThanEqual {
+        left: Box<AST>,
+        right: Box<AST>,
+    },
+
+    GreaterThanEqual {
+        left: Box<AST>,
+        right: Box<AST>,
+    },
+
     Call {
         callee: String,
         args: Vec<AST>,
@@ -91,6 +111,11 @@ impl fmt::Display for AST {
             AST::Subtract { left, right } => write!(f, "({} - {})", left, right),
             AST::Multiply { left, right } => write!(f, "({} * {})", left, right),
             AST::Divide { left, right } => write!(f, "({} / {})", left, right),
+            AST::LessThan { left, right } => write!(f, "({} < {})", left, right),
+            AST::GreaterThan { left, right } => write!(f, "({} > {})", left, right),
+            AST::LessThanEqual { left, right } => write!(f, "({} <= {})", left, right),
+            AST::GreaterThanEqual { left, right } => write!(f, "({} >= {})", left, right),
+
             AST::Call { callee, args } => write!(
                 f,
                 "{} ({})",
@@ -179,9 +204,9 @@ mod tests {
                     left: AST::Number(20).into(),
                     right: AST::Number(20).into(),
                 }
-                    .into(),
-            )
                 .into(),
+            )
+            .into(),
         };
 
         println!("{}", ast);

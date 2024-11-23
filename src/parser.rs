@@ -85,6 +85,11 @@ peg::parser! {
     pub rule expressionPrecedence() -> AST = precedence!{
         x:(@) _ "==" _ y:@ { AST::Equal{left:x.into(), right:y.into()} }
         x:(@) _ "!=" _ y:@ { AST::NotEqual{left:x.into(), right:y.into()} }
+         --
+        x:(@) _ ">=" _ y:@ { AST::GreaterThanEqual{left:x.into(), right:y.into()} }
+        x:(@) _ ">" _ y:@ { AST::GreaterThan{left:x.into(), right:y.into()} }
+        x:(@) _ "<=" _ y:@ { AST::LessThanEqual{left:x.into(), right:y.into()} }
+        x:(@) _ "<" _ y:@ { AST::LessThan{left:x.into(), right:y.into()} }
         --
         x:(@) _ "+" _ y:@ { AST::Add{left:x.into(), right:y.into()} }
         x:(@) _ "-" _ y:@ { AST::Subtract{left:x.into(), right:y.into()} }
@@ -331,6 +336,26 @@ mod tests {
     }
 
     #[test]
+    fn infix_comparison1() {
+        lang_parser::expression("a > 1").expect("Parser failed");
+    }
+
+    #[test]
+    fn infix_comparison2() {
+        lang_parser::expression("a < 1").expect("Parser failed");
+    }
+
+    #[test]
+    fn infix_comparison3() {
+        lang_parser::expression("a >= 1").expect("Parser failed");
+    }
+
+    #[test]
+    fn infix_comparison4() {
+        lang_parser::expression("a <= 1").expect("Parser failed");
+    }
+
+    #[test]
     fn substract() {
         let expected_ast = AST::Subtract {
             left: 12.into(),
@@ -427,6 +452,56 @@ mod tests {
         )
     }
 
+    #[test]
+    fn comparison_ast1() {
+        let expected_ast = AST::GreaterThan {
+            left: 1.into(),
+            right: 2.into(),
+        };
+        println!("{}", expected_ast);
+        assert_eq!(
+            expected_ast,
+            lang_parser::expression("1 > 2").expect("Parser failed")
+        )
+    }
+
+    #[test]
+    fn comparison_ast2() {
+        let expected_ast = AST::GreaterThan {
+            left: 1.into(),
+            right: 2.into(),
+        };
+        println!("{}", expected_ast);
+        assert_eq!(
+            expected_ast,
+            lang_parser::expression("1 >2").expect("Parser failed")
+        )
+    }
+    #[test]
+    fn comparison_ast3() {
+        let expected_ast = AST::LessThan {
+            left: 1.into(),
+            right: 2.into(),
+        };
+        println!("{}", expected_ast);
+        assert_eq!(
+            expected_ast,
+            lang_parser::expression("1 <2").expect("Parser failed")
+        )
+    }
+
+    #[test]
+    fn comparison_ast4() {
+        let expected_ast = AST::LessThanEqual {
+            left: 1.into(),
+            right: 2.into(),
+        };
+        println!("{}", expected_ast);
+        assert_eq!(
+            expected_ast,
+            lang_parser::expression("1<=2").expect("Parser failed")
+        )
+    }
     ///
     ///
     #[test]

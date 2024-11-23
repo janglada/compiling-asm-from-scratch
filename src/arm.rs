@@ -41,6 +41,14 @@ impl Backend for ArmBackend {
             AST::Multiply { left, right } => self.emit_multiply(left, right, writer),
             AST::Divide { left, right } => self.emit_divide(left, right, writer),
             AST::Equal { left, right } => self.emit_equal(left, right, writer),
+
+            AST::LessThan { left, right } => self.emit_less_than(left, right, writer),
+            AST::LessThanEqual { left, right } => self.emit_less_than_equal(left, right, writer),
+            AST::GreaterThan { left, right } => self.emit_greater_than(left, right, writer),
+            AST::GreaterThanEqual { left, right } => {
+                self.emit_greater_than_equal(left, right, writer)
+            }
+
             AST::NotEqual { left, right } => self.emit_not_equal(left, right, writer),
             AST::Block(statements) => self.emit_block(statements, writer),
             AST::Call { args, callee } => self.emit_call(args, callee, writer),
@@ -172,6 +180,74 @@ impl Backend for ArmBackend {
     ) -> std::io::Result<()> {
         self.emit_infix_operands(left, right, writer);
         writeln!(writer, "\tmul r0, r0, r1")
+    }
+
+    fn emit_greater_than(
+        &mut self,
+        left: &Box<AST>,
+        right: &Box<AST>,
+
+        writer: &mut dyn Write,
+    ) -> std::io::Result<()> {
+        self.emit_infix_operands(left, right, writer);
+        write!(writer, "\t")?;
+        writeln!(
+            writer,
+            r#"cmp r0, r1
+    movgt r0, #1
+    movle r0, #0"#
+        )
+    }
+
+    fn emit_greater_than_equal(
+        &mut self,
+        left: &Box<AST>,
+        right: &Box<AST>,
+
+        writer: &mut dyn Write,
+    ) -> std::io::Result<()> {
+        self.emit_infix_operands(left, right, writer);
+        write!(writer, "\t")?;
+        writeln!(
+            writer,
+            r#"cmp r0, r1
+    movge r0, #1
+    movlt r0, #0"#
+        )
+    }
+
+    fn emit_less_than(
+        &mut self,
+        left: &Box<AST>,
+        right: &Box<AST>,
+
+        writer: &mut dyn Write,
+    ) -> std::io::Result<()> {
+        self.emit_infix_operands(left, right, writer);
+        write!(writer, "\t")?;
+        writeln!(
+            writer,
+            r#"cmp r0, r1
+    movlt r0, #1
+    movge r0, #0"#
+        )
+    }
+
+    fn emit_less_than_equal(
+        &mut self,
+        left: &Box<AST>,
+        right: &Box<AST>,
+
+        writer: &mut dyn Write,
+    ) -> std::io::Result<()> {
+        self.emit_infix_operands(left, right, writer);
+        write!(writer, "\t")?;
+        writeln!(
+            writer,
+            r#"cmp r0, r1
+    movle r0, #1
+    movgt r0, #0"#
+        )
     }
 
     fn emit_equal(
@@ -650,6 +726,63 @@ mod tests {
         assert_eq!("T".to_string(), String::from_utf8(result.stdout).unwrap());
     }
 
+    #[test]
+    fn compile_comparison() {
+        let result = compile_and_run(
+            r#"function main() {
+                assert(5 > 4);
+            }"#,
+        )
+        .expect("Compile an run failed");
+
+        assert_eq!("T".to_string(), String::from_utf8(result.stdout).unwrap());
+    }
+
+    #[test]
+    fn compile_comparison1() {
+        let result = compile_and_run(
+            r#"function main() {
+                assert(2 >= 1);
+            }"#,
+        )
+        .expect("Compile an run failed");
+
+        assert_eq!("T".to_string(), String::from_utf8(result.stdout).unwrap());
+    }
+
+    #[test]
+    fn compile_comparison3() {
+        let result = compile_and_run(
+            r#"function main() {
+                assert(1 <= 2);
+            }"#,
+        )
+        .expect("Compile an run failed");
+
+        assert_eq!("T".to_string(), String::from_utf8(result.stdout).unwrap());
+    }
+    #[test]
+    fn compile_comparison4() {
+        let result = compile_and_run(
+            r#"function main() {
+                assert(1 < 2);
+            }"#,
+        )
+        .expect("Compile an run failed");
+
+        assert_eq!("T".to_string(), String::from_utf8(result.stdout).unwrap());
+    }
+    #[test]
+    fn compile_comparison5() {
+        let result = compile_and_run(
+            r#"function main() {
+                assert(1 < 1);
+            }"#,
+        )
+        .expect("Compile an run failed");
+
+        assert_eq!("F".to_string(), String::from_utf8(result.stdout).unwrap());
+    }
     #[test]
     fn compile_block() {
         compile_and_run(

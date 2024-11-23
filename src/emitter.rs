@@ -61,6 +61,38 @@ pub trait Backend {
         writer: &mut dyn Write,
     ) -> std::io::Result<()>;
 
+    fn emit_greater_than(
+        &mut self,
+        left: &Box<AST>,
+        right: &Box<AST>,
+
+        writer: &mut dyn Write,
+    ) -> std::io::Result<()>;
+
+    fn emit_greater_than_equal(
+        &mut self,
+        left: &Box<AST>,
+        right: &Box<AST>,
+
+        writer: &mut dyn Write,
+    ) -> std::io::Result<()>;
+
+    fn emit_less_than(
+        &mut self,
+        left: &Box<AST>,
+        right: &Box<AST>,
+
+        writer: &mut dyn Write,
+    ) -> std::io::Result<()>;
+
+    fn emit_less_than_equal(
+        &mut self,
+        left: &Box<AST>,
+        right: &Box<AST>,
+
+        writer: &mut dyn Write,
+    ) -> std::io::Result<()>;
+
     fn emit_call(
         &mut self,
         args: &Vec<AST>,
