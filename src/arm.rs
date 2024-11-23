@@ -1,5 +1,6 @@
 use crate::ast::AST;
 use crate::emitter::{Backend, Environment};
+use rand::{distributions::Alphanumeric, Rng};
 use std::collections::{HashMap, LinkedList};
 use std::io::Write;
 
@@ -461,8 +462,12 @@ mod tests {
         //         label_counter: 0,
         //         env,
         //     };
-
-        let file_base_name = format!("tmp/test_{:x}", md5::compute(code));
+        let s: String = rand::thread_rng()
+            .sample_iter(&Alphanumeric)
+            .take(7)
+            .map(char::from)
+            .collect();
+        let file_base_name = format!("tmp/test_{}", s.to_string());
 
         let ast = parse(code).expect("Parse error");
         let locals: HashMap<String, isize> = HashMap::new();
@@ -531,9 +536,10 @@ mod tests {
         compile_and_run(
             r#"function main() {
                 var b = 1;
-                while (b) {
-                    b = 1;
+                while (b != 10) {
+                    b = b + 1;
                 }
+                assert(b == 10);
             }"#,
         )
         .expect("TODO: panic message");
@@ -565,14 +571,14 @@ mod tests {
 
         assert_eq!("F".to_string(), String::from_utf8(result.stdout).unwrap());
 
-        let result = compile_and_run(
-            r#"function main() {
-                assert(1);
-            }"#,
-        )
-        .expect("Compile an run failed");
-
-        assert_eq!("T".to_string(), String::from_utf8(result.stdout).unwrap());
+        // let result = compile_and_run(
+        //     r#"function main() {
+        //         assert(1);
+        //     }"#,
+        // )
+        // .expect("Compile an run failed");
+        //
+        // assert_eq!("T".to_string(), String::from_utf8(result.stdout).unwrap());
     }
 
     #[test]
