@@ -1222,7 +1222,33 @@ var x = 1;
 
     #[test]
     fn nested_if_statements() {
-        let result = lang_parser::parser(r#"
+        let expected_ast = AST::Function {
+            name: "main".to_string(),
+            parameters: vec![],
+            body: AST::Block(vec![
+                AST::IfNode {
+                    conditional: Box::new(AST::Number(1)),
+                    consequence: Box::new(AST::Block(vec![
+                        AST::IfNode {
+                            conditional: Box::new(AST::Number(2)),
+                            consequence: Box::new(AST::Block(vec![
+                                AST::Assert(Box::new(AST::Number(1)))
+                            ])),
+                            alternative: Box::new(AST::Block(vec![
+                                AST::Assert(Box::new(AST::Number(0)))
+                            ]))
+                        }
+                    ])),
+                    alternative: Box::new(AST::Block(vec![
+                        AST::Assert(Box::new(AST::Number(0)))
+                    ]))
+                }
+            ]).into()
+        };
+
+        assert_eq!(
+            expected_ast,
+            lang_parser::parser(r#"
             function main() {
                 if (1) {
                     if (2) {
@@ -1234,26 +1260,116 @@ var x = 1;
                     assert(0);
                 }
             }
-        "#).expect("Parser failed");
+        "#).expect("Parser failed")
+        );
     }
 
     #[test]
     fn complex_arithmetic() {
-        let result = lang_parser::expression("(1 + 2) * 3 / (4 - 2) + 5").expect("Parser failed");
+        let expected_ast = AST::Add {
+            left: Box::new(AST::Divide {
+                left: Box::new(AST::Multiply {
+                    left: Box::new(AST::Add {
+                        left: Box::new(AST::Number(1)),
+                        right: Box::new(AST::Number(2))
+                    }),
+                    right: Box::new(AST::Number(3))
+                }),
+                right: Box::new(AST::Subtract {
+                    left: Box::new(AST::Number(4)),
+                    right: Box::new(AST::Number(2))
+                })
+            }),
+            right: Box::new(AST::Number(5))
+        };
+
+        assert_eq!(
+            expected_ast,
+            lang_parser::expression("(1 + 2) * 3 / (4 - 2) + 5").expect("Parser failed")
+        );
     }
 
     #[test]
     fn multiple_function_parameters() {
-        let result = lang_parser::parser(r#"
+        let expected_ast = AST::Function {
+            name: "test".to_string(),
+            parameters: vec!["a".to_string(), "b".to_string(), "c".to_string(), "d".to_string()],
+            body: Box::new(AST::Block(vec![
+                AST::Return {
+                    term: Box::new(AST::Add {
+                        left: Box::new(AST::Add {
+                            left: Box::new(AST::Add {
+                                left: Box::new(AST::Id("a".to_string())),
+                                right: Box::new(AST::Id("b".to_string()))
+                            }),
+                            right: Box::new(AST::Id("c".to_string()))
+                        }),
+                        right: Box::new(AST::Id("d".to_string()))
+                    })
+                }
+            ]))
+        };
+
+        assert_eq!(
+            expected_ast,
+            lang_parser::parser(r#"
             function test(a, b, c, d) {
                 return a + b + c + d;
             }
-        "#).expect("Parser failed");
+        "#).expect("Parser failed")
+        );
     }
 
     #[test]
     fn nested_while_loops() {
-        let result = lang_parser::parser(r#"
+        let expected_ast = AST::Function {
+            name: "main".to_string(),
+            parameters: vec![],
+            body: Box::new(AST::Block(vec![
+                AST::Var {
+                    name: "i".to_string(),
+                    value: Box::new(AST::Number(0))
+                },
+                AST::While {
+                    conditional: Box::new(AST::LessThan {
+                        left: Box::new(AST::Id("i".to_string())),
+                        right: Box::new(AST::Number(3))
+                    }),
+                    body: Box::new(AST::Block(vec![
+                        AST::Var {
+                            name: "j".to_string(),
+                            value: Box::new(AST::Number(0))
+                        },
+                        AST::While {
+                            conditional: Box::new(AST::LessThan {
+                                left: Box::new(AST::Id("j".to_string())),
+                                right: Box::new(AST::Number(2))
+                            }),
+                            body: Box::new(AST::Block(vec![
+                                AST::Assign {
+                                    name: "j".to_string(),
+                                    value: Box::new(AST::Add {
+                                        left: Box::new(AST::Id("j".to_string())),
+                                        right: Box::new(AST::Number(1))
+                                    })
+                                }
+                            ]))
+                        },
+                        AST::Assign {
+                            name: "i".to_string(),
+                            value: Box::new(AST::Add {
+                                left: Box::new(AST::Id("i".to_string())),
+                                right: Box::new(AST::Number(1))
+                            })
+                        }
+                    ]))
+                }
+            ]))
+        };
+
+        assert_eq!(
+            expected_ast,
+            lang_parser::parser(r#"
             function main() {
                 var i = 0;
                 while (i < 3) {
@@ -1264,6 +1380,7 @@ var x = 1;
                     i = i + 1;
                 }
             }
-        "#).expect("Parser failed");
+        "#).expect("Parser failed")
+        );
     }
 }
