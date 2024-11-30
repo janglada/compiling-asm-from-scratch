@@ -1219,4 +1219,51 @@ var x = 1;
             .expect("Parser failed")
         );
     }
+
+    #[test]
+    fn nested_if_statements() {
+        let result = lang_parser::parser(r#"
+            function main() {
+                if (1) {
+                    if (2) {
+                        assert(1);
+                    } else {
+                        assert(0);
+                    }
+                } else {
+                    assert(0);
+                }
+            }
+        "#).expect("Parser failed");
+    }
+
+    #[test]
+    fn complex_arithmetic() {
+        let result = lang_parser::expression("(1 + 2) * 3 / (4 - 2) + 5").expect("Parser failed");
+    }
+
+    #[test]
+    fn multiple_function_parameters() {
+        let result = lang_parser::parser(r#"
+            function test(a, b, c, d) {
+                return a + b + c + d;
+            }
+        "#).expect("Parser failed");
+    }
+
+    #[test]
+    fn nested_while_loops() {
+        let result = lang_parser::parser(r#"
+            function main() {
+                var i = 0;
+                while (i < 3) {
+                    var j = 0;
+                    while (j < 2) {
+                        j = j + 1;
+                    }
+                    i = i + 1;
+                }
+            }
+        "#).expect("Parser failed");
+    }
 }

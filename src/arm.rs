@@ -24,6 +24,100 @@ impl ArmBackend {
         writeln!(writer, "\tmov r0, #0")?;
         writeln!(writer, "\tpop {{ fp, pc }}")
     }
+
+    #[test]
+    fn compile_nested_if() {
+        let result = compile_and_run(r#"
+            function main() {
+                if (1) {
+                    if (1) {
+                        assert(1);
+                    } else {
+                        assert(0);
+                    }
+                } else {
+                    assert(0);
+                }
+            }
+        "#).expect("Compile and run failed");
+        assert_eq!("T".to_string(), String::from_utf8(result.stdout).unwrap());
+    }
+
+    #[test]
+    fn compile_nested_while() {
+        let result = compile_and_run(r#"
+            function main() {
+                var i = 0;
+                var count = 0;
+                while (i < 2) {
+                    var j = 0;
+                    while (j < 3) {
+                        count = count + 1;
+                        j = j + 1;
+                    }
+                    i = i + 1;
+                }
+                assert(count == 6);
+            }
+        "#).expect("Compile and run failed");
+        assert_eq!("T".to_string(), String::from_utf8(result.stdout).unwrap());
+    }
+
+    #[test]
+    fn compile_complex_arithmetic() {
+        let result = compile_and_run(r#"
+            function main() {
+                assert((2 + 3) * 4 / 2 + 1 == 11);
+            }
+        "#).expect("Compile and run failed");
+        assert_eq!("T".to_string(), String::from_utf8(result.stdout).unwrap());
+    }
+
+    #[test]
+    fn compile_function_max_args() {
+        let result = compile_and_run(r#"
+            function max(a, b, c, d) {
+                if (a > b && a > c && a > d) return a;
+                if (b > c && b > d) return b;
+                if (c > d) return c;
+                return d;
+            }
+            
+            function main() {
+                assert(max(1, 4, 2, 3) == 4);
+            }
+        "#).expect("Compile and run failed");
+        assert_eq!("T".to_string(), String::from_utf8(result.stdout).unwrap());
+    }
+
+    #[test]
+    fn compile_multiple_vars() {
+        let result = compile_and_run(r#"
+            function main() {
+                var a = 1;
+                var b = 2;
+                var c = 3;
+                var d = 4;
+                assert(a + b + c + d == 10);
+            }
+        "#).expect("Compile and run failed");
+        assert_eq!("T".to_string(), String::from_utf8(result.stdout).unwrap());
+    }
+
+    #[test]
+    fn compile_recursive_function() {
+        let result = compile_and_run(r#"
+            function sum(n) {
+                if (n <= 0) return 0;
+                return n + sum(n - 1);
+            }
+            
+            function main() {
+                assert(sum(4) == 10);
+            }
+        "#).expect("Compile and run failed");
+        assert_eq!("T".to_string(), String::from_utf8(result.stdout).unwrap());
+    }
 }
 
 impl Backend for ArmBackend {
