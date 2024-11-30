@@ -71,6 +71,9 @@ impl Backend for ArmBackend {
             AST::Var { name, value } => self.emit_var(name, value, writer),
             AST::Assign { name, value } => self.emit_assign(name, value, writer),
             AST::While { conditional, body } => self.emit_while(conditional, body, writer),
+            AST::Boolean(value) => self.emit_boolean(*value, writer),
+            AST::Null => self.emit_null(writer),
+            AST::Undefined => self.emit_undefined(writer),
             // AST::While { .. } => {}
             _ => {
                 writeln!(writer)
@@ -433,6 +436,18 @@ impl Backend for ArmBackend {
         writeln!(writer, "\tb {}", loop_start)?;
         writeln!(writer, "{}:", loop_end)
     }
+
+    fn emit_boolean(&mut self, value: bool, writer: &mut dyn Write) -> std::io::Result<()> {
+        writeln!(writer, "\tmov r0, #{}", if value { 1 } else { 0 })
+    }
+
+    fn emit_null(&mut self, writer: &mut dyn Write) -> std::io::Result<()> {
+        writeln!(writer, "\tmov r0, #0")
+    }
+
+    fn emit_undefined(&mut self, writer: &mut dyn Write) -> std::io::Result<()> {
+        writeln!(writer, "\tmov r0, #0")
+    }
 }
 
 #[cfg(test)]
@@ -608,8 +623,8 @@ mod tests {
     }
 
     #[test]
-    fn compile_main() {
-        compile_and_run(
+    fn compile_while_ne() {
+        let result = compile_and_run(
             r#"function main() {
                 var b = 1;
                 while (b != 10) {
@@ -619,6 +634,22 @@ mod tests {
             }"#,
         )
         .expect("TODO: panic message");
+        assert_eq!("T".to_string(), String::from_utf8(result.stdout).unwrap());
+    }
+
+    #[test]
+    fn compile_while_lt() {
+        let result = compile_and_run(
+            r#"function main() {
+                var b = 0;
+                while (b <= 10000) {
+                    b = b + 1;
+                }
+                assert(b == 10001);
+            }"#,
+        )
+        .expect("TODO: panic message");
+        assert_eq!("T".to_string(), String::from_utf8(result.stdout).unwrap());
     }
 
     #[test]
@@ -646,15 +677,40 @@ mod tests {
         .expect("Compile an run failed");
 
         assert_eq!("F".to_string(), String::from_utf8(result.stdout).unwrap());
+    }
 
-        // let result = compile_and_run(
-        //     r#"function main() {
-        //         assert(1);
-        //     }"#,
-        // )
-        // .expect("Compile an run failed");
-        //
-        // assert_eq!("T".to_string(), String::from_utf8(result.stdout).unwrap());
+    #[test]
+    fn compile_assert_boolean() {
+        let result = compile_and_run(
+            r#"function main() {
+                assert(true);
+                assert(false);
+            }"#,
+        )
+        .expect("Compile an run failed");
+        assert_eq!("TF".to_string(), String::from_utf8(result.stdout).unwrap());
+    }
+
+    #[test]
+    fn compile_assert_null() {
+        let result = compile_and_run(
+            r#"function main() {
+                assert(null);
+            }"#,
+        )
+        .expect("Compile an run failed");
+        assert_eq!("F".to_string(), String::from_utf8(result.stdout).unwrap());
+    }
+
+    #[test]
+    fn compile_assert_undefined() {
+        let result = compile_and_run(
+            r#"function main() {
+                assert(undefined);
+            }"#,
+        )
+        .expect("Compile an run failed");
+        assert_eq!("F".to_string(), String::from_utf8(result.stdout).unwrap());
     }
 
     #[test]
@@ -823,7 +879,7 @@ mod tests {
 
     #[test]
     fn compile_if_1() {
-        compile_and_run(
+        let result = compile_and_run(
             r#"function main() {
                 { 
                     if (1) {
@@ -835,6 +891,7 @@ mod tests {
             }"#,
         )
         .expect("Compile an run failed");
+        assert_eq!("T".to_string(), String::from_utf8(result.stdout).unwrap());
     }
 
     #[test]
@@ -924,8 +981,8 @@ mod tests {
 }
 
 function main() {
-   assert(6 == factorial(3));
-  return 0;
+   assert(720 == factorial(6));
+   return 0;
 }
             "#,
         )
@@ -967,7 +1024,7 @@ function main() {
     }
     #[test]
     fn assign_local_var() {
-        compile_and_run(
+        let result = compile_and_run(
             r#"function main() {
                     var a = 1;
                     assert(a == 1);
@@ -977,5 +1034,7 @@ function main() {
             "#,
         )
         .expect("Compile an run failed");
+
+        assert_eq!("TT", String::from_utf8(result.stdout).unwrap());
     }
 }

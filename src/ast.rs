@@ -82,6 +82,10 @@ pub enum AST {
         conditional: Box<AST>,
         body: Box<AST>,
     },
+    Undefined,
+    Null,
+
+    Boolean(bool),
 
     Main(Vec<AST>),
     Assert(Box<AST>),
@@ -115,6 +119,7 @@ impl fmt::Display for AST {
             AST::GreaterThan { left, right } => write!(f, "({} > {})", left, right),
             AST::LessThanEqual { left, right } => write!(f, "({} <= {})", left, right),
             AST::GreaterThanEqual { left, right } => write!(f, "({} >= {})", left, right),
+            AST::Boolean(value) => write!(f, "({})", value),
 
             AST::Call { callee, args } => write!(
                 f,
@@ -160,6 +165,12 @@ impl fmt::Display for AST {
             }
             AST::Assert(condition) => {
                 write!(f, "assert({})", condition)
+            }
+            AST::Undefined => {
+                write!(f, "undefined")
+            }
+            AST::Null => {
+                write!(f, "null")
             }
         }
     }

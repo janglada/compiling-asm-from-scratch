@@ -13,6 +13,17 @@ peg::parser! {
     pub rule Id() -> AST
       = n:$([ 'a'..='z' | 'A'..='Z']['a'..='z' | '_' |  'A'..='Z' | '0'..='9' ]*) { AST::Id(n.to_string()) }
 
+    pub rule True() -> AST
+      = "true" { AST::Boolean(true) }
+
+    pub rule False() -> AST
+      = "false" { AST::Boolean(false) }
+
+    pub rule Null() -> AST
+      = "null" { AST::Null }
+
+    pub rule Undefined() -> AST
+      = "undefined" { AST::Undefined }
 
     pub rule args() -> Vec<AST>
       = expression() ** (_ "," _)
@@ -77,7 +88,7 @@ peg::parser! {
    //    }
    //  }
     pub rule atom() -> AST
-      = call() / Id() / Number()
+      = call() / True() / False() / Null() / Undefined() / Id() / Number()
 
     /// alow whitespaces before after
     pub rule expression() -> AST = _ e:expressionPrecedence() _ {e }
@@ -630,6 +641,44 @@ mod tests {
         assert_eq!(
             expected_ast,
             lang_parser::parser("var a=1;").expect("Parser failed")
+        );
+    }
+    #[test]
+    fn var_assign_bool() {
+        let expected_ast = AST::Var {
+            name: "a".to_string(),
+            value: AST::Boolean(true).into(),
+        };
+        println!("{}", expected_ast);
+        assert_eq!(
+            expected_ast,
+            lang_parser::parser("var a = true;").expect("Parser failed")
+        );
+    }
+
+    #[test]
+    fn var_assign_null() {
+        let expected_ast = AST::Var {
+            name: "a".to_string(),
+            value: AST::Null.into(),
+        };
+        println!("{}", expected_ast);
+        assert_eq!(
+            expected_ast,
+            lang_parser::parser("var a = null;").expect("Parser failed")
+        );
+    }
+
+    #[test]
+    fn var_assign_undefined() {
+        let expected_ast = AST::Var {
+            name: "a".to_string(),
+            value: AST::Undefined.into(),
+        };
+        println!("{}", expected_ast);
+        assert_eq!(
+            expected_ast,
+            lang_parser::parser("var a = undefined;").expect("Parser failed")
         );
     }
 

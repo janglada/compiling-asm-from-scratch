@@ -143,4 +143,8 @@ pub trait Backend {
         body: &Box<AST>,
         writer: &mut dyn Write,
     ) -> std::io::Result<()>;
+
+    fn emit_boolean(&mut self, value: bool, writer: &mut dyn Write) -> std::io::Result<()>;
+    fn emit_null(&mut self, writer: &mut dyn Write) -> std::io::Result<()>;
+    fn emit_undefined(&mut self, writer: &mut dyn Write) -> std::io::Result<()>;
 }
