@@ -730,7 +730,7 @@ mod tests {
     fn compile_comparison() {
         let result = compile_and_run(
             r#"function main() {
-                assert(5 > 4);
+                assert(4 < 5);
             }"#,
         )
         .expect("Compile an run failed");
