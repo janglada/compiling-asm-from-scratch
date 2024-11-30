@@ -193,7 +193,7 @@ impl Backend for ArmBackend {
         write!(writer, "\t")?;
         writeln!(
             writer,
-            r#"cmp r0, r1
+            r#"cmp r1, r0
     movgt r0, #1
     movle r0, #0"#
         )
@@ -210,7 +210,7 @@ impl Backend for ArmBackend {
         write!(writer, "\t")?;
         writeln!(
             writer,
-            r#"cmp r0, r1
+            r#"cmp r1, r0
     movge r0, #1
     movlt r0, #0"#
         )
@@ -227,7 +227,7 @@ impl Backend for ArmBackend {
         write!(writer, "\t")?;
         writeln!(
             writer,
-            r#"cmp r0, r1
+            r#"cmp r1, r0
     movlt r0, #1
     movge r0, #0"#
         )
@@ -244,7 +244,7 @@ impl Backend for ArmBackend {
         write!(writer, "\t")?;
         writeln!(
             writer,
-            r#"cmp r0, r1
+            r#"cmp r1, r0
     movle r0, #1
     movgt r0, #0"#
         )
@@ -737,9 +737,19 @@ mod tests {
 
         assert_eq!("T".to_string(), String::from_utf8(result.stdout).unwrap());
     }
-
     #[test]
-    fn compile_comparison1() {
+    fn compile_comparison_gt() {
+        let result = compile_and_run(
+            r#"function main() {
+                assert(8 > 7);
+            }"#,
+        )
+        .expect("Compile an run failed");
+
+        assert_eq!("T".to_string(), String::from_utf8(result.stdout).unwrap());
+    }
+    #[test]
+    fn compile_comparison_ge() {
         let result = compile_and_run(
             r#"function main() {
                 assert(2 >= 1);
