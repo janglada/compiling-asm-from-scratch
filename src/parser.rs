@@ -28,6 +28,13 @@ peg::parser! {
     pub rule args() -> Vec<AST>
       = expression() ** (_ "," _)
 
+    pub rule ArrayLiteral() -> AST
+      =  _ "[" _ a: args() _ "]" _ { AST::ArrayLiteral(a) }
+
+    pub rule ArrayLookup() -> AST
+        = id:Id() _ "[" _ e:expression() _ "]" {
+            AST::ArrayLookup {array: Box::new(id),index: Box::new(e)}
+        }
 
     ///
     ///
@@ -88,7 +95,7 @@ peg::parser! {
    //    }
    //  }
     pub rule atom() -> AST
-      = call() / True() / False() / Null() / Undefined() / Id() / Number()
+      = call() / ArrayLiteral() / ArrayLookup() /  True() / False() / Null() / Undefined() / Id() / Number()
 
     /// alow whitespaces before after
     pub rule expression() -> AST = _ e:expressionPrecedence() _ {e }
@@ -1411,5 +1418,47 @@ var x = 1;
             )
             .expect("Parser failed")
         );
+    }
+
+    #[test]
+    fn arrayliteral() {
+        let expected_ast = AST::ArrayLiteral(vec![
+            AST::Number(1),
+            AST::Number(2),
+            AST::Id("myVar".to_string()),
+            AST::Add {
+                left: AST::Number(100).into(),
+                right: AST::Number(9).into(),
+            },
+        ]);
+
+        println!("{}", expected_ast);
+        assert_eq!(
+            expected_ast,
+            lang_parser::expression("[1, 2, myVar, 100+9]").expect("Parser failed")
+        )
+    }
+
+    #[test]
+    fn arrayliteral_assign() {
+        let expected_ast = AST::Var {
+            name: "myArray".to_string(),
+            value: AST::ArrayLiteral(vec![
+                // AST::Boolean(true),
+                AST::Number(2),
+                AST::Id("myVar".to_string()),
+                AST::Add {
+                    left: AST::Number(100).into(),
+                    right: AST::Number(9).into(),
+                },
+            ])
+            .into(),
+        };
+
+        println!("{}", expected_ast);
+        assert_eq!(
+            expected_ast,
+            lang_parser::expression("var myArray =[2, myVar, 100+9]").expect("Parser failed")
+        )
     }
 }

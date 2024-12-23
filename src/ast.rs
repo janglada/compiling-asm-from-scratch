@@ -86,6 +86,12 @@ pub enum AST {
     Null,
 
     Boolean(bool),
+    ArrayLiteral(Vec<AST>),
+    ArrayLookup {
+        array: Box<AST>,
+        index: Box<AST>,
+    },
+    ArrayLength(Box<AST>),
 
     Main(Vec<AST>),
     Assert(Box<AST>),
@@ -119,7 +125,7 @@ impl fmt::Display for AST {
             AST::GreaterThan { left, right } => write!(f, "({} > {})", left, right),
             AST::LessThanEqual { left, right } => write!(f, "({} <= {})", left, right),
             AST::GreaterThanEqual { left, right } => write!(f, "({} >= {})", left, right),
-            AST::Boolean(value) => write!(f, "({})", value),
+            AST::Boolean(value) => write!(f, "{}", value),
 
             AST::Call { callee, args } => write!(
                 f,
@@ -171,6 +177,21 @@ impl fmt::Display for AST {
             }
             AST::Null => {
                 write!(f, "null")
+            }
+            AST::ArrayLiteral(args) => {
+                let mut vec_str = args.into_iter().map(|v| v.to_string()).collect::<Vec<_>>();
+
+                write!(f, "[{}]", vec_str.join(","))
+                // for v in args.iter() {
+                //     write!(f, "{}", v.to_string());
+                // }
+                // write!(f, "]\n")
+            }
+            AST::ArrayLookup { array, index } => {
+                write!(f, "array[{}]\n", index)
+            }
+            AST::ArrayLength(array) => {
+                write!(f, "array.length\n")
             }
         }
     }
