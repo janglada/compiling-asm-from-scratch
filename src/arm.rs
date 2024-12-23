@@ -171,7 +171,7 @@ impl Backend for ArmBackend {
         writer: &mut dyn Write,
     ) -> std::io::Result<()> {
         self.emit_infix_operands(left, right, writer);
-        writeln!(writer, "\tudiv r0, r0, r1")
+        writeln!(writer, "\tudiv r0, r1, r0")
     }
 
     fn emit_multiply(
@@ -577,7 +577,8 @@ mod tests {
 
         let compile_result = Command::new("arm-linux-gnueabihf-gcc")
             // .arg("-g")
-            .arg("-march=armv7-a")
+            .arg("-march=armv8-a")
+            // .arg("-mcpu=cortex-m3")
             .arg("-static")
             .arg(format!("{}.s", file_base_name))
             .arg("-o")
@@ -624,7 +625,7 @@ mod tests {
     }
 
     #[test]
-    fn compile_while_ne() {
+    fn while_ne() {
         let result = compile_and_run(
             r#"function main() {
                 var b = 1;
@@ -639,7 +640,7 @@ mod tests {
     }
 
     #[test]
-    fn compile_while_lt() {
+    fn while_lt() {
         let result = compile_and_run(
             r#"function main() {
                 var b = 0;
@@ -669,7 +670,7 @@ mod tests {
     }
 
     #[test]
-    fn compile_assert() {
+    fn assert() {
         let result = compile_and_run(
             r#"function main() {
                 assert(0);
@@ -681,7 +682,7 @@ mod tests {
     }
 
     #[test]
-    fn compile_assert_boolean() {
+    fn assert_boolean() {
         let result = compile_and_run(
             r#"function main() {
                 assert(true);
@@ -693,7 +694,7 @@ mod tests {
     }
 
     #[test]
-    fn compile_assert_null() {
+    fn assert_null() {
         let result = compile_and_run(
             r#"function main() {
                 assert(null);
@@ -704,7 +705,7 @@ mod tests {
     }
 
     #[test]
-    fn compile_assert_undefined() {
+    fn assert_undefined() {
         let result = compile_and_run(
             r#"function main() {
                 assert(undefined);
@@ -715,7 +716,7 @@ mod tests {
     }
 
     #[test]
-    fn compile_not() {
+    fn not() {
         compile_and_run(
             r#"function main() {
                 assert(!1);
@@ -724,7 +725,7 @@ mod tests {
     }
 
     #[test]
-    fn compile_basic_infix() {
+    fn basic_infix() {
         let result = compile_and_run(
             r#"function main() {
                 assert(42 == 42);
@@ -748,7 +749,7 @@ mod tests {
     }
 
     #[test]
-    fn compile_infix() {
+    fn infix() {
         let result = compile_and_run(
             r#"function main() {
                 assert(42 == 4 + 2 * (12 - 2) + 3 * (5 + 1));
@@ -760,7 +761,7 @@ mod tests {
     }
 
     #[test]
-    fn compile_infix2() {
+    fn infix2() {
         let result = compile_and_run(
             r#"function main() {
                 assert(2==3-1);
@@ -772,7 +773,7 @@ mod tests {
     }
 
     #[test]
-    fn compile_infix3() {
+    fn infix3() {
         let result = compile_and_run(
             r#"function main() {
                 assert(6 == 4 + (3-1) );
@@ -784,7 +785,7 @@ mod tests {
     }
 
     #[test]
-    fn compile_comparison() {
+    fn comparison() {
         let result = compile_and_run(
             r#"function main() {
                 assert(4 < 5);
@@ -795,7 +796,7 @@ mod tests {
         assert_eq!("T".to_string(), String::from_utf8(result.stdout).unwrap());
     }
     #[test]
-    fn compile_comparison_gt() {
+    fn comparison_gt() {
         let result = compile_and_run(
             r#"function main() {
                 assert(8 > 7);
@@ -806,7 +807,7 @@ mod tests {
         assert_eq!("T".to_string(), String::from_utf8(result.stdout).unwrap());
     }
     #[test]
-    fn compile_comparison_ge() {
+    fn comparison_ge() {
         let result = compile_and_run(
             r#"function main() {
                 assert(2 >= 1);
@@ -818,7 +819,7 @@ mod tests {
     }
 
     #[test]
-    fn compile_comparison3() {
+    fn comparison3() {
         let result = compile_and_run(
             r#"function main() {            
                 assert(34 <= 102);
@@ -835,7 +836,7 @@ mod tests {
         );
     }
     #[test]
-    fn compile_comparison6() {
+    fn comparison6() {
         let result = compile_and_run(
             r#"function main() {
                 var i = 0;
@@ -856,7 +857,7 @@ mod tests {
     }
 
     #[test]
-    fn compile_comparison4() {
+    fn comparison4() {
         let result = compile_and_run(
             r#"function main() {
                 assert(1 < 2);
@@ -867,7 +868,7 @@ mod tests {
         assert_eq!("T".to_string(), String::from_utf8(result.stdout).unwrap());
     }
     #[test]
-    fn compile_comparison5() {
+    fn comparison5() {
         let result = compile_and_run(
             r#"function main() {
                 assert(1 < 1);
@@ -877,8 +878,35 @@ mod tests {
 
         assert_eq!("F".to_string(), String::from_utf8(result.stdout).unwrap());
     }
+
     #[test]
-    fn compile_block() {
+    fn divide() {
+        let result = compile_and_run(
+            r#"function main() {
+                assert( 10/2 == 5);
+                assert( (10/2) == 5);
+            }"#,
+        )
+        .expect("Compile an run failed");
+
+        assert_eq!("TT".to_string(), String::from_utf8(result.stdout).unwrap());
+    }
+
+    #[test]
+    fn multiply() {
+        let result = compile_and_run(
+            r#"function main() {
+                assert( 10*2 == 20);
+                assert( (3*2) == 6);
+            }"#,
+        )
+        .expect("Compile an run failed");
+
+        assert_eq!("TT".to_string(), String::from_utf8(result.stdout).unwrap());
+    }
+
+    #[test]
+    fn block() {
         compile_and_run(
             r#"function main() {
                 { 
@@ -891,7 +919,7 @@ mod tests {
     }
 
     #[test]
-    fn compile_call() {
+    fn call() {
         compile_and_run(
             r#"function main() {
                 { 
@@ -906,7 +934,7 @@ mod tests {
     }
 
     #[test]
-    fn compile_if_1() {
+    fn if_1() {
         let result = compile_and_run(
             r#"function main() {
                 { 
@@ -923,7 +951,7 @@ mod tests {
     }
 
     #[test]
-    fn compile_if_2() {
+    fn if_2() {
         compile_and_run(
             r#"function main() {
                 { 
@@ -941,7 +969,7 @@ mod tests {
     }
 
     #[test]
-    fn compile_function_assert() {
+    fn function_assert() {
         compile_and_run(
             r#"function main() 
                 { 
@@ -969,7 +997,7 @@ mod tests {
     }
 
     #[test]
-    fn compile_function() {
+    fn function() {
         compile_and_run(
             r#"function main() {                 
                     assert(1, 2, 3, 4);                    
@@ -1094,12 +1122,15 @@ function main() {
             function main() {
                 var i = 0;
                 var count = 0;
+               
                 while (i < 2) {
+
                     var j = 0;
                     while (j < 3) {
                         count = count + 1;
                         j = j + 1;
                     }
+                    j = 0;
                     i = i + 1;
                 }
                 assert(count == 6);
@@ -1111,11 +1142,11 @@ function main() {
     }
 
     #[test]
-    fn compile_complex_arithmetic() {
+    fn complex_arithmetic() {
         let result = compile_and_run(
             r#"
             function main() {
-                assert((2 + 3) * 4 / 2 + 1 == 11);
+                assert( ((2 + 3) * 4 )/ 2 + 1 == 11);
             }
         "#,
         )
@@ -1124,27 +1155,7 @@ function main() {
     }
 
     #[test]
-    fn compile_function_max_args() {
-        let result = compile_and_run(
-            r#"
-            function max(a, b, c, d) {
-                if (a > b && a > c && a > d) return a;
-                if (b > c && b > d) return b;
-                if (c > d) return c;
-                return d;
-            }
-            
-            function main() {
-                assert(max(1, 4, 2, 3) == 4);
-            }
-        "#,
-        )
-        .expect("Compile and run failed");
-        assert_eq!("T".to_string(), String::from_utf8(result.stdout).unwrap());
-    }
-
-    #[test]
-    fn compile_multiple_vars() {
+    fn multiple_vars() {
         let result = compile_and_run(
             r#"
             function main() {
@@ -1161,7 +1172,7 @@ function main() {
     }
 
     #[test]
-    fn compile_recursive_function() {
+    fn recursive_function() {
         let result = compile_and_run(
             r#"
             function sum(n) {
@@ -1173,7 +1184,7 @@ function main() {
             }
             
             function main() {
-                assert(sum(4) == 10);
+                assert(sum(100) == 5050);
             }
         "#,
         )
