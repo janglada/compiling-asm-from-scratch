@@ -147,4 +147,23 @@ pub trait Backend {
     fn emit_boolean(&mut self, value: bool, writer: &mut dyn Write) -> std::io::Result<()>;
     fn emit_null(&mut self, writer: &mut dyn Write) -> std::io::Result<()>;
     fn emit_undefined(&mut self, writer: &mut dyn Write) -> std::io::Result<()>;
+
+    fn emit_array_literal(
+        &mut self,
+        array_items: &Vec<AST>,
+        writer: &mut dyn Write,
+    ) -> std::io::Result<()>;
+
+    fn emit_array_lookup(
+        &mut self,
+        array: &Box<AST>,
+        index: &Box<AST>,
+        writer: &mut dyn Write,
+    ) -> std::io::Result<()>;
+
+    fn emit_array_length(
+        &mut self,
+        array: &Box<AST>,
+        writer: &mut dyn Write,
+    ) -> std::io::Result<()>;
 }

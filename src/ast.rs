@@ -188,10 +188,10 @@ impl fmt::Display for AST {
                 // write!(f, "]\n")
             }
             AST::ArrayLookup { array, index } => {
-                write!(f, "array[{}]\n", index)
+                write!(f, "{}[{}]", array, index)
             }
             AST::ArrayLength(array) => {
-                write!(f, "array.length\n")
+                write!(f, "{}.length", array)
             }
         }
     }

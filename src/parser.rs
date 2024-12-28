@@ -29,12 +29,10 @@ peg::parser! {
       = expression() ** (_ "," _)
 
     pub rule ArrayLiteral() -> AST
-      =  _ "[" _ a: args() _ "]" _ { AST::ArrayLiteral(a) }
+      =   "[" _ a: args() _ "]" { AST::ArrayLiteral(a) }
 
     pub rule ArrayLookup() -> AST
-        = id:Id() _ "[" _ e:expression() _ "]" {
-            AST::ArrayLookup {array: Box::new(id),index: Box::new(e)}
-        }
+        = id:Id() _ "[" _ e:expression() _ "]" { AST::ArrayLookup {array: Box::new(id),index: Box::new(e)} }
 
     ///
     ///
@@ -44,6 +42,10 @@ peg::parser! {
                 let mut iter = a.into_iter().take(1);
                 let ast: AST = iter.next().unwrap();
                 AST::Assert(Box::new(ast))
+            } else if callee.to_string() == "length" {
+                let mut iter = a.into_iter().take(1);
+                let ast: AST = iter.next().unwrap();
+                AST::ArrayLength(Box::new(ast))
             } else {
               AST::Call {
                 callee: callee.to_string(),
@@ -51,49 +53,7 @@ peg::parser! {
               }
             }
     }
-   ///
-   /// INFIX
-   // pub rule sum() -> AST
-   //      = _ l:product() _ op:$("+" / "-") _ r:product()  _ {
-   //
-   //          match op {
-   //              "+" =>  AST::Add{left:l.into(), right:r.into()},
-   //              "-" =>  AST::Subtract{left:l.into(), right:r.into()},
-   //               x => panic!("sum found op {}", x)
-   //          }
-   //      } / product()
-   //
-   // pub rule product() -> AST
-   //      = _ l:comparison() _ op:$("*" / "/") _ r:comparison() _ {
-   //
-   //          match op {
-   //              "*" =>  AST::Multiply{left:l.into(), right:r.into()},
-   //              "/" =>  AST::Divide{left:l.into(), right:r.into()},
-   //               x => panic!("product found op {}", x)
-   //          }
-   //
-   //      }
-   //      / comparison()
-   //
-   //
-   //  pub  rule comparison() -> AST
-   //          = _ l:unary() _ op:$("==" / "!=") _ r:unary() _ {
-   //
-   //              match op {
-   //                  "==" =>  AST::Equal{left: l.into(), right: r.into()},
-   //                  "!=" =>  AST::NotEqual{left:l.into(), right:r.into()},
-   //              x => panic!("comparison found op {}", x)
-   //              }
-   //
-   //          } / unary()
-   //
-   //  pub rule unary() -> AST
-   //    = n:("!")? a:atom() {
-   //      match n {
-   //        Some(term) => AST::Not(a.into()),
-   //        None => a
-   //    }
-   //  }
+
     pub rule atom() -> AST
       = call() / ArrayLiteral() / ArrayLookup() /  True() / False() / Null() / Undefined() / Id() / Number()
 
@@ -145,7 +105,7 @@ peg::parser! {
 
 
    pub rule whileStmt() -> AST
-            = "while"  _ "(" _ conditional: expression()  _ ")"  _   body: statement() _ {
+            = WHILE()   "(" _ conditional: expression()  _ ")"  _   body: statement() _ {
             AST::While {
                 conditional: conditional.into(),
                 body: body.into()
@@ -153,7 +113,7 @@ peg::parser! {
         }
 
   pub rule varStmt() -> AST
-            = VAR()  _ id:Id() _ ASSIGN() _ value:expression() _ ";" _{
+            = VAR()   id:Id()  ASSIGN()  value:expression() _ ";" _{
             if let AST::Id(name) = id {
                 AST::Var {
                     name,
@@ -164,7 +124,7 @@ peg::parser! {
             }
         }
    pub rule assignmentStmt() -> AST
-            =  id:Id() _ ASSIGN() _ value:expression() _ ";" _ {
+            =  id:Id()  ASSIGN()  value:expression() _ ";" _ {
               if let AST::Id(name) = id {
                 AST::Assign {
                     name,
@@ -234,7 +194,7 @@ peg::parser! {
     /// keywords
     ///
     ///
-    pub rule ASSIGN() = "="
+    pub rule ASSIGN() = _ "=" _
 
     pub rule FUNCTION() = "function"
 
@@ -244,9 +204,9 @@ peg::parser! {
 
     pub rule RETURN() = "return"
 
-    pub rule VAR() = "var"
+    pub rule VAR() = "var" " "
 
-    pub rule WHILE() = "while"
+    pub rule WHILE() = "while" _
 
 
 
@@ -673,6 +633,31 @@ mod tests {
         assert_eq!(
             expected_ast,
             lang_parser::parser("var a = null;").expect("Parser failed")
+        );
+    }
+    #[test]
+    fn var_assign_empty_array() {
+        let expected_ast = AST::Var {
+            name: "a".to_string(),
+            value: AST::ArrayLiteral(vec![]).into(),
+        };
+        println!("{}", expected_ast);
+        assert_eq!(
+            expected_ast,
+            lang_parser::parser("var a = [];").expect("Parser failed")
+        );
+    }
+
+    #[test]
+    fn var_assign_non_empty_array() {
+        let expected_ast = AST::Var {
+            name: "a".to_string(),
+            value: AST::ArrayLiteral(vec![AST::Number(1)]).into(),
+        };
+        println!("{}", expected_ast);
+        assert_eq!(
+            expected_ast,
+            lang_parser::parser("var a = [1];").expect("Parser failed")
         );
     }
 
@@ -1442,7 +1427,7 @@ var x = 1;
     #[test]
     fn arrayliteral_assign() {
         let expected_ast = AST::Var {
-            name: "myArray".to_string(),
+            name: "a".to_string(),
             value: AST::ArrayLiteral(vec![
                 // AST::Boolean(true),
                 AST::Number(2),
@@ -1458,7 +1443,52 @@ var x = 1;
         println!("{}", expected_ast);
         assert_eq!(
             expected_ast,
-            lang_parser::expression("var myArray =[2, myVar, 100+9]").expect("Parser failed")
+            lang_parser::statement("var a = [2, myVar,(100 + 9)];").expect("Parser failed")
+        )
+    }
+
+    #[test]
+    fn arraylookup() {
+        let expected_ast = AST::ArrayLookup {
+            array: AST::Id("myArray".to_string()).into(),
+            index: AST::Number(2).into(),
+        };
+
+        println!("{}", expected_ast);
+        assert_eq!(
+            expected_ast,
+            lang_parser::expression("myArray[2]").expect("Parser failed")
+        )
+    }
+    #[test]
+    fn arraylookup_index_exp() {
+        let expected_ast = AST::ArrayLookup {
+            array: AST::Id("myArray".to_string()).into(),
+            index: AST::Add {
+                left: AST::Number(4).into(),
+                right: AST::Number(5).into(),
+            }
+            .into(),
+        };
+
+        println!("{}", expected_ast);
+        assert_eq!(
+            expected_ast,
+            lang_parser::expression("myArray[4+5]").expect("Parser failed")
+        )
+    }
+
+    #[test]
+    fn array_length() {
+        let expected_ast = AST::Var {
+            name: "a".to_string(),
+            value: AST::ArrayLength(AST::Id("b".to_string()).into()).into(),
+        };
+
+        println!("{}", expected_ast);
+        assert_eq!(
+            expected_ast,
+            lang_parser::statement("var a =  length(b);").expect("Parser failed")
         )
     }
 }

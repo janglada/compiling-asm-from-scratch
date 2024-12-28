@@ -74,6 +74,9 @@ impl Backend for ArmBackend {
             AST::Boolean(value) => self.emit_boolean(*value, writer),
             AST::Null => self.emit_null(writer),
             AST::Undefined => self.emit_undefined(writer),
+            AST::ArrayLiteral(items) => self.emit_array_literal(items, writer),
+            AST::ArrayLookup { array, index } => self.emit_array_lookup(array, index, writer),
+            AST::ArrayLength(array) => self.emit_array_length(array, writer),
             // AST::While { .. } => {}
             _ => {
                 writeln!(writer)
@@ -447,6 +450,56 @@ impl Backend for ArmBackend {
 
     fn emit_undefined(&mut self, writer: &mut dyn Write) -> std::io::Result<()> {
         writeln!(writer, "\tmov r0, #0")
+    }
+
+    fn emit_array_literal(
+        &mut self,
+        array_items: &Vec<AST>,
+        writer: &mut dyn Write,
+    ) -> std::io::Result<()> {
+        let len = array_items.len();
+        writeln!(writer, "\tldr r0, ={}", 4 * (len + 1));
+        writeln!(writer, "\tbl malloc");
+        writeln!(writer, "\tpush {{r4, ip}}");
+        writeln!(writer, "\tmov r4, r0");
+        writeln!(writer, "\tldr r0, ={}", len);
+        writeln!(writer, "\tstr r0, [r4]");
+        for (i, item) in array_items.iter().enumerate() {
+            let mut env = self.env.pop_back().expect("Missing environment");
+            self.write(item, writer)?;
+            self.env.push_back(env);
+            writeln!(writer, "\tstr r0, [r4, #{}]", 4 * (i + 1));
+        }
+
+        writeln!(writer, "\tmov r0, r4");
+        writeln!(writer, "\tpop {{r4, ip}}")
+    }
+
+    fn emit_array_lookup(
+        &mut self,
+        array: &Box<AST>,
+        index: &Box<AST>,
+        writer: &mut dyn Write,
+    ) -> std::io::Result<()> {
+        self.write(array, writer)?;
+        writeln!(writer, "\tpush {{r0, ip}}");
+        self.write(index, writer)?;
+        writeln!(writer, "\tpop {{r1, ip}}");
+        writeln!(writer, "\tldr r2, [r1]");
+        writeln!(writer, "\tcmp r0, r2");
+        writeln!(writer, "\tmovhs r0, #0");
+        writeln!(writer, "\taddlo r1, r1, #4");
+        writeln!(writer, "\tlsllo r0, r0, #2");
+        writeln!(writer, "\tldrlo r0, [r1, r0]")
+    }
+
+    fn emit_array_length(
+        &mut self,
+        array: &Box<AST>,
+        writer: &mut dyn Write,
+    ) -> std::io::Result<()> {
+        self.write(array, writer)?;
+        writeln!(writer, "\tldr r0, [r0, #0]")
     }
 }
 
@@ -1190,5 +1243,48 @@ function main() {
         )
         .expect("Compile and run failed");
         assert_eq!("T".to_string(), String::from_utf8(result.stdout).unwrap());
+    }
+
+    #[test]
+    fn array_literal_assert() {
+        let result = compile_and_run(
+            r#"
+             function main() {
+                var x = [1, 2, 3];
+                assert(x[0] == 1);
+                assert(x[1] == 2);
+                assert(x[2] == 3);
+                assert(length(x) == 3);
+            }
+        "#,
+        )
+        .expect("Compile and run failed");
+        assert_eq!(
+            "TTTT".to_string(),
+            String::from_utf8(result.stdout).unwrap()
+        );
+    }
+
+    #[test]
+    fn array_literal_assert_vars() {
+        let result = compile_and_run(
+            r#"
+             function main() {
+                var a = 1;
+                var b = 2;
+                var c = 3;
+                var x = [a, b, c];
+                assert(x[0] == a);
+                assert(x[1] == b);
+                assert(x[2] == c);
+                assert(length(x) == 3);
+            }
+        "#,
+        )
+        .expect("Compile and run failed");
+        assert_eq!(
+            "TTTT".to_string(),
+            String::from_utf8(result.stdout).unwrap()
+        );
     }
 }
