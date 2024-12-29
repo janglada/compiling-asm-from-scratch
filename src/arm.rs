@@ -465,9 +465,7 @@ impl Backend for ArmBackend {
         writeln!(writer, "\tldr r0, ={}", len);
         writeln!(writer, "\tstr r0, [r4]");
         for (i, item) in array_items.iter().enumerate() {
-            let mut env = self.env.pop_back().expect("Missing environment");
             self.write(item, writer)?;
-            self.env.push_back(env);
             writeln!(writer, "\tstr r0, [r4, #{}]", 4 * (i + 1));
         }
 
@@ -1274,9 +1272,9 @@ function main() {
                 var b = 2;
                 var c = 3;
                 var x = [a, b, c];
-                assert(x[0] == a);
-                assert(x[1] == b);
-                assert(x[2] == c);
+                assert(x[0] == 1);
+                assert(x[1] == 2);
+                assert(x[2] == 3);
                 assert(length(x) == 3);
             }
         "#,
