@@ -143,6 +143,7 @@ impl Backend for ArmBackend {
         &mut self,
         left: &Box<AST>,
         right: &Box<AST>,
+        right: &Box<AST>,
 
         writer: &mut dyn Write,
     ) -> std::io::Result<()> {
