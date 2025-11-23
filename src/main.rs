@@ -1,6 +1,6 @@
 extern crate core;
 
-mod arm;
+// mod arm;
 mod ast;
 
 mod arm_code_generator;
