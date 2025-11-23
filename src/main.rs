@@ -4,7 +4,6 @@ extern crate core;
 mod ast;
 
 mod arm_code_generator;
-mod emitter;
 mod error;
 mod parser;
 mod visitor;

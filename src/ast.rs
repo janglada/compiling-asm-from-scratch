@@ -179,7 +179,7 @@ impl fmt::Display for AST {
                 write!(f, "null")
             }
             AST::ArrayLiteral(args) => {
-                let mut vec_str = args.into_iter().map(|v| v.to_string()).collect::<Vec<_>>();
+                let vec_str = args.into_iter().map(|v| v.to_string()).collect::<Vec<_>>();
 
                 write!(f, "[{}]", vec_str.join(","))
                 // for v in args.iter() {

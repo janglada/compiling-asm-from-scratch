@@ -1,5 +1,4 @@
 use crate::ast::AST;
-use crate::visitor;
 pub trait Visitor<T, W> {
     fn visit_assert(&mut self, node: &AST, w: W) -> std::io::Result<T>;
     fn visit_array_length(&mut self, node: &AST, w: W) -> std::io::Result<T>;

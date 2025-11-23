@@ -1,7 +1,6 @@
 use crate::ast::AST;
-use crate::emitter::Environment;
 use crate::visitor::{AstVisitor, Visitor};
-use std::collections::{HashMap, LinkedList};
+use std::collections::HashMap;
 use std::io::Write;
 
 struct ArmCodeGenerator {
@@ -457,11 +456,6 @@ mod tests {
     }
 
     fn compile_and_run(code: &str) -> Result<Output, CompileError> {
-        let mut env = LinkedList::new();
-        env.push_back(Environment {
-            locals: HashMap::new(),
-            next_local_offset: 0,
-        });
         let s: String = rand::thread_rng()
             .sample_iter(&Alphanumeric)
             .take(7)
