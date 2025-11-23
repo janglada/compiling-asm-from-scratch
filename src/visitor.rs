@@ -1,6 +1,7 @@
 use crate::ast::AST;
 pub trait Visitor<T, W> {
     fn visit_assert(&mut self, node: &AST, w: W) -> std::io::Result<T>;
+    fn visit_print(&mut self, node: &AST, w: W) -> std::io::Result<T>;
     fn visit_array_length(&mut self, node: &AST, w: W) -> std::io::Result<T>;
     fn visit_array_lookup(&mut self, node: &AST, w: W) -> std::io::Result<T>;
     fn visit_array_literal(&mut self, node: &AST, w: W) -> std::io::Result<T>;
@@ -68,6 +69,7 @@ impl AstVisitor for AST {
             AST::ArrayLength(_) => v.visit_array_length(self, w),
             AST::Main(_) => v.visit_main(self, w),
             AST::Assert(_) => v.visit_assert(self, w),
+            AST::Print(_) => v.visit_print(self, w),
         }
     }
 

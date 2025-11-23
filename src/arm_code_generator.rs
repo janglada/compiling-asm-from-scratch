@@ -65,6 +65,46 @@ impl Visitor<(), &mut dyn Write> for ArmCodeGenerator {
         )
     }
 
+    fn visit_print(&mut self, node: &AST, w: &mut dyn Write) -> std::io::Result<()> {
+        let AST::Print(value) = node else {
+            panic!("Expected Print node, got: {:?}", node)
+        };
+
+        // Generate a unique label for the format string
+        let fmt_label = format!(".Lprint_fmt_{}", self.label_counter);
+        let skip_label = format!(".Lskip_fmt_{}", self.label_counter);
+        self.label_counter += 1;
+
+        // Visit the value to get it in r0
+        value.visit(self, w)?;
+
+        // Save the value to r4 (callee-saved register)
+        writeln!(w, "\tpush {{r4, ip}}")?;
+        writeln!(w, "\tmov r4, r0")?;
+
+        // Branch around the format string data
+        writeln!(w, "\tb {}", skip_label)?;
+        writeln!(w, "\t.align 2")?;
+        writeln!(w, "{}:", fmt_label)?;
+        writeln!(w, "\t.asciz \"%d\\n\"")?;
+        writeln!(w, "\t.align 2")?;
+        writeln!(w, "{}:", skip_label)?;
+
+        // Load the format string address into r0 using adr (PC-relative)
+        writeln!(w, "\tadr r0, {}", fmt_label)?;
+
+        // Move the saved value to r1 (second argument for printf)
+        writeln!(w, "\tmov r1, r4")?;
+
+        // Call printf
+        writeln!(w, "\tbl printf")?;
+
+        // Restore registers
+        writeln!(w, "\tpop {{r4, ip}}")?;
+
+        Ok(())
+    }
+
     fn visit_array_length(&mut self, node: &AST, writer: &mut dyn Write) -> std::io::Result<()> {
         let AST::ArrayLength(array) = node else {
             panic!("Expected Assert node, got: {:?}", node)
@@ -200,7 +240,7 @@ impl Visitor<(), &mut dyn Write> for ArmCodeGenerator {
         };
         self.visit_infix_operands(left, right, writer);
         write!(writer, "\t")?;
-        writeln!(writer, "sub r0, r0, r1")
+        writeln!(writer, "mul r0, r0, r1")
     }
 
     fn visit_divide(&mut self, node: &AST, writer: &mut dyn Write) -> std::io::Result<()> {
@@ -333,6 +373,7 @@ impl Visitor<(), &mut dyn Write> for ArmCodeGenerator {
         let end_if_label = self.new_label();
         conditional.visit(self, writer)?;
         writeln!(writer, "\tcmp r0, #0")?;
+        writeln!(writer, "\tbeq {}", if_false_label)?;
         consequence.visit(self, writer)?;
         writeln!(writer, "\tb {}", end_if_label)?;
         writeln!(writer, "{}:", if_false_label)?;
@@ -447,6 +488,7 @@ mod tests {
     use rand::distributions::Alphanumeric;
     use rand::Rng;
     use std::fs::File;
+    use std::hash::{DefaultHasher, Hash, Hasher};
     use std::io;
     use std::process::Command;
 
@@ -461,11 +503,16 @@ mod tests {
             .take(7)
             .map(char::from)
             .collect();
-        let file_base_name = format!("tmp/test_{}", s.to_string());
+
+        let mut hasher = DefaultHasher::new();
+        code.hash(&mut hasher);
+        println!("Hash is {:x}!", hasher.finish());
+
+        let file_base_name = format!("tmp/test_{:x}", hasher.finish());
 
         let mut generator: ArmCodeGenerator = Default::default();
         let ast = parse(code).expect("Parse error");
-        ast.visit(
+        let _ = ast.visit(
             &mut generator,
             &mut File::create(format!("{}.s", file_base_name)).expect("Open file failed"),
         );
@@ -933,14 +980,15 @@ mod tests {
 }
 
 function main() {
+    print(factorial(6));
    assert(720 == factorial(6));
    return 0;
 }
             "#,
         )
         .expect("Compile and run failed");
-        //println!("{}", String::from_utf8(result.stdout).unwrap());
-        assert_eq!("T", String::from_utf8(result.stdout).unwrap());
+        let output = String::from_utf8(result.stdout).unwrap();
+        assert_eq!("720\nT", output);
     }
     #[test]
     fn empty_main() {
@@ -1068,6 +1116,67 @@ function main() {
     }
 
     #[test]
+    fn print_simple() {
+        let result = compile_and_run(
+            r#"
+            function main() {
+                print(42);
+            }
+        "#,
+        )
+        .expect("Compile and run failed");
+        let output = String::from_utf8(result.stdout).unwrap();
+        println!("Output: '{}'", output);
+        assert!(
+            output.contains("42"),
+            "Expected 42 in output, got: {}",
+            output
+        );
+    }
+
+    #[test]
+    fn sum_without_print() {
+        let result = compile_and_run(
+            r#"
+            function sum(n) {
+                if (n <= 0) {
+                    return 0;
+                } else {
+                    return n + sum(n - 1);
+                }
+            }
+
+            function main() {
+                assert(sum(100) == 5050);
+            }
+        "#,
+        )
+        .expect("Compile and run failed");
+        let output = String::from_utf8(result.stdout).unwrap();
+        assert_eq!("T", output);
+    }
+
+    #[test]
+    fn print_with_var() {
+        let result = compile_and_run(
+            r#"
+            function main() {
+                var x = 5050;
+                print(x);
+                print(100);
+                print(42);
+            }
+        "#,
+        )
+        .expect("Compile and run failed");
+        let output = String::from_utf8(result.stdout).unwrap();
+        println!("Output: '{}'", output);
+        assert!(output.contains("5050"), "Expected 5050 in output");
+        assert!(output.contains("100"), "Expected 100 in output");
+        assert!(output.contains("42"), "Expected 42 in output");
+    }
+
+    #[test]
     fn recursive_function() {
         let result = compile_and_run(
             r#"
@@ -1078,14 +1187,16 @@ function main() {
                     return n + sum(n - 1);
                 }
             }
-            
+
             function main() {
+                print(sum(100));
                 assert(sum(100) == 5050);
             }
         "#,
         )
         .expect("Compile and run failed");
-        assert_eq!("T".to_string(), String::from_utf8(result.stdout).unwrap());
+        let output = String::from_utf8(result.stdout).unwrap();
+        assert_eq!("5050\nT", output);
     }
 
     #[test]
@@ -1129,5 +1240,532 @@ function main() {
             "TTTT".to_string(),
             String::from_utf8(result.stdout).unwrap()
         );
+    }
+
+    // ========== NEW TESTS: Print Functionality ==========
+
+    #[test]
+    fn print_arithmetic_expressions() {
+        let result = compile_and_run(
+            r#"
+            function main() {
+                print(10 + 20);
+                print(50 - 8);
+                print(6 * 7);
+                print(100 / 4);
+            }
+        "#,
+        )
+        .expect("Compile and run failed");
+        let output = String::from_utf8(result.stdout).unwrap();
+        assert!(output.contains("30"), "Expected 30 in output");
+        assert!(output.contains("42"), "Expected 42 in output");
+        assert!(output.contains("25"), "Expected 25 in output");
+    }
+
+    #[test]
+    fn print_in_loop() {
+        let result = compile_and_run(
+            r#"
+            function main() {
+                var i = 1;
+                while (i <= 3) {
+                    print(i);
+                    i = i + 1;
+                }
+            }
+        "#,
+        )
+        .expect("Compile and run failed");
+        let output = String::from_utf8(result.stdout).unwrap();
+        assert!(output.contains("1"), "Expected 1 in output");
+        assert!(output.contains("2"), "Expected 2 in output");
+        assert!(output.contains("3"), "Expected 3 in output");
+    }
+
+    #[test]
+    fn print_in_conditional() {
+        let result = compile_and_run(
+            r#"
+            function main() {
+                var x = 10;
+                if (x > 5) {
+                    print(100);
+                } else {
+                    print(200);
+                }
+                if (x < 5) {
+                    print(300);
+                } else {
+                    print(400);
+                }
+            }
+        "#,
+        )
+        .expect("Compile and run failed");
+        let output = String::from_utf8(result.stdout).unwrap();
+        assert!(output.contains("100"), "Expected 100 in output");
+        assert!(output.contains("400"), "Expected 400 in output");
+        assert!(!output.contains("200"), "Should not contain 200");
+        assert!(!output.contains("300"), "Should not contain 300");
+    }
+
+    #[test]
+    fn print_array_elements() {
+        let result = compile_and_run(
+            r#"
+            function main() {
+                var arr = [10, 20, 30];
+                print(arr[0]);
+                print(arr[1]);
+                print(arr[2]);
+                print(length(arr));
+            }
+        "#,
+        )
+        .expect("Compile and run failed");
+        let output = String::from_utf8(result.stdout).unwrap();
+        assert!(output.contains("10"), "Expected 10 in output");
+        assert!(output.contains("20"), "Expected 20 in output");
+        assert!(output.contains("30"), "Expected 30 in output");
+        assert!(output.contains("3"), "Expected 3 in output");
+    }
+
+    // ========== NEW TESTS: Nested Conditionals ==========
+
+    #[test]
+    fn deeply_nested_if() {
+        let result = compile_and_run(
+            r#"
+            function main() {
+                var x = 10;
+                if (x > 5) {
+                    if (x > 8) {
+                        if (x > 9) {
+                            print(42);
+                        } else {
+                            print(99);
+                        }
+                    } else {
+                        print(88);
+                    }
+                } else {
+                    print(77);
+                }
+            }
+        "#,
+        )
+        .expect("Compile and run failed");
+        let output = String::from_utf8(result.stdout).unwrap();
+        assert_eq!("42\n", output);
+    }
+
+    #[test]
+    fn if_with_complex_conditions() {
+        let result = compile_and_run(
+            r#"
+            function main() {
+                var a = 5;
+                var b = 10;
+                if ((a < b) == true) {
+                    assert(1);
+                } else {
+                    assert(0);
+                }
+                if ((a > b) == false) {
+                    assert(1);
+                } else {
+                    assert(0);
+                }
+            }
+        "#,
+        )
+        .expect("Compile and run failed");
+        assert_eq!("TT", String::from_utf8(result.stdout).unwrap());
+    }
+
+    // ========== NEW TESTS: Multiple Function Calls ==========
+
+    #[test]
+    fn function_calling_function() {
+        let result = compile_and_run(
+            r#"
+            function add(a, b) {
+                return a + b;
+            }
+
+            function multiply(a, b) {
+                return a * b;
+            }
+
+            function calculate(x) {
+                return multiply(add(x, 2), 3);
+            }
+
+            function main() {
+                print(calculate(5));
+                assert(calculate(5) == 21);
+            }
+        "#,
+        )
+        .expect("Compile and run failed");
+        let output = String::from_utf8(result.stdout).unwrap();
+        assert_eq!("21\nT", output);
+    }
+
+    #[test]
+    fn multiple_function_definitions() {
+        let result = compile_and_run(
+            r#"
+            function double(n) {
+                return n * 2;
+            }
+
+            function triple(n) {
+                return n * 3;
+            }
+
+            function quad(n) {
+                return n * 4;
+            }
+
+            function main() {
+                assert(double(5) == 10);
+                assert(triple(4) == 12);
+                assert(quad(3) == 12);
+            }
+        "#,
+        )
+        .expect("Compile and run failed");
+        assert_eq!("TTT", String::from_utf8(result.stdout).unwrap());
+    }
+
+    // ========== NEW TESTS: Advanced Recursion ==========
+
+    #[test]
+    fn fibonacci() {
+        let result = compile_and_run(
+            r#"
+            function fib(n) {
+                if (n <= 1) {
+                    return n;
+                } else {
+                    return fib(n - 1) + fib(n - 2);
+                }
+            }
+
+            function main() {
+                print(fib(10));
+                assert(fib(10) == 55);
+            }
+        "#,
+        )
+        .expect("Compile and run failed");
+        let output = String::from_utf8(result.stdout).unwrap();
+        assert_eq!("55\nT", output);
+    }
+
+    #[test]
+    fn recursive_countdown() {
+        let result = compile_and_run(
+            r#"
+            function countdown(n) {
+                if (n <= 0) {
+                    return 0;
+                } else {
+                    print(n);
+                    return countdown(n - 1);
+                }
+            }
+
+            function main() {
+                countdown(5);
+            }
+        "#,
+        )
+        .expect("Compile and run failed");
+        let output = String::from_utf8(result.stdout).unwrap();
+        let lines: Vec<&str> = output.lines().collect();
+        assert_eq!(5, lines.len());
+        assert_eq!("5", lines[0]);
+        assert_eq!("1", lines[4]);
+    }
+
+    #[test]
+    fn power_recursive() {
+        let result = compile_and_run(
+            r#"
+            function power(base, exp) {
+                if (exp == 0) {
+                    return 1;
+                } else {
+                    return base * power(base, exp - 1);
+                }
+            }
+
+            function main() {
+                print(power(2, 8));
+                assert(power(2, 8) == 256);
+                assert(power(3, 3) == 27);
+            }
+        "#,
+        )
+        .expect("Compile and run failed");
+        let output = String::from_utf8(result.stdout).unwrap();
+        assert!(output.contains("256"), "Expected 256 in output");
+        assert!(output.contains("TT"), "Expected TT in output");
+    }
+
+    // ========== NEW TESTS: Loops with Complex Logic ==========
+
+    #[test]
+    fn while_with_multiple_vars() {
+        let result = compile_and_run(
+            r#"
+            function main() {
+                var i = 0;
+                var sum = 0;
+                while (i < 5) {
+                    sum = sum + i;
+                    i = i + 1;
+                }
+                print(sum);
+                assert(sum == 10);
+            }
+        "#,
+        )
+        .expect("Compile and run failed");
+        let output = String::from_utf8(result.stdout).unwrap();
+        assert_eq!("10\nT", output);
+    }
+
+    #[test]
+    fn nested_while_loops() {
+        let result = compile_and_run(
+            r#"
+            function main() {
+                var i = 0;
+                var j = 0;
+                var count = 0;
+
+                while (i < 3) {
+                    j = 0;
+                    while (j < 4) {
+                        count = count + 1;
+                        j = j + 1;
+                    }
+                    i = i + 1;
+                }
+
+                print(count);
+                assert(count == 12);
+            }
+        "#,
+        )
+        .expect("Compile and run failed");
+        let output = String::from_utf8(result.stdout).unwrap();
+        assert_eq!("12\nT", output);
+    }
+
+    #[test]
+    fn while_with_early_termination() {
+        let result = compile_and_run(
+            r#"
+            function main() {
+                var i = 0;
+                var found = 0;
+
+                while (i < 100) {
+                    if (i == 42) {
+                        found = 1;
+                        i = 100;
+                    } else {
+                        i = i + 1;
+                    }
+                }
+
+                print(found);
+                assert(found == 1);
+            }
+        "#,
+        )
+        .expect("Compile and run failed");
+        let output = String::from_utf8(result.stdout).unwrap();
+        assert_eq!("1\nT", output);
+    }
+
+    // ========== NEW TESTS: Boolean Logic ==========
+
+    #[test]
+    fn boolean_operations() {
+        let result = compile_and_run(
+            r#"
+            function main() {
+                var t = true;
+                var f = false;
+
+                assert(t == true);
+                assert(f == false);
+                assert(!f == true);
+                assert(!t == false);
+            }
+        "#,
+        )
+        .expect("Compile and run failed");
+        assert_eq!("TTTT", String::from_utf8(result.stdout).unwrap());
+    }
+
+    #[test]
+    fn comparison_chains() {
+        let result = compile_and_run(
+            r#"
+            function main() {
+                var x = 10;
+
+                assert((x > 5) == true);
+                assert((x < 15) == true);
+                assert((x >= 10) == true);
+                assert((x <= 10) == true);
+                assert((x == 10) == true);
+                assert((x != 10) == false);
+            }
+        "#,
+        )
+        .expect("Compile and run failed");
+        assert_eq!("TTTTTT", String::from_utf8(result.stdout).unwrap());
+    }
+
+    // ========== NEW TESTS: Array Operations ==========
+
+    #[test]
+    fn array_modification_simulation() {
+        let result = compile_and_run(
+            r#"
+            function main() {
+                var arr = [1, 2, 3, 4, 5];
+                var sum = 0;
+                var i = 0;
+
+                while (i < length(arr)) {
+                    sum = sum + arr[i];
+                    i = i + 1;
+                }
+
+                print(sum);
+                assert(sum == 15);
+            }
+        "#,
+        )
+        .expect("Compile and run failed");
+        let output = String::from_utf8(result.stdout).unwrap();
+        assert_eq!("15\nT", output);
+    }
+
+    #[test]
+    fn empty_array() {
+        let result = compile_and_run(
+            r#"
+            function main() {
+                var arr = [];
+                print(length(arr));
+                assert(length(arr) == 0);
+            }
+        "#,
+        )
+        .expect("Compile and run failed");
+        let output = String::from_utf8(result.stdout).unwrap();
+        assert_eq!("0\nT", output);
+    }
+
+    #[test]
+    fn array_with_expressions() {
+        let result = compile_and_run(
+            r#"
+            function main() {
+                var x = 10;
+                var arr = [x, x + 1, x * 2];
+
+                assert(arr[0] == 10);
+                assert(arr[1] == 11);
+                assert(arr[2] == 20);
+            }
+        "#,
+        )
+        .expect("Compile and run failed");
+        assert_eq!("TTT", String::from_utf8(result.stdout).unwrap());
+    }
+
+    // ========== NEW TESTS: Edge Cases ==========
+
+    #[test]
+    fn zero_operations() {
+        let result = compile_and_run(
+            r#"
+            function main() {
+                print(0);
+                assert(0 == 0);
+                assert(0 < 1);
+                assert(0 * 100 == 0);
+                assert(0 + 0 == 0);
+            }
+        "#,
+        )
+        .expect("Compile and run failed");
+        let output = String::from_utf8(result.stdout).unwrap();
+        assert!(output.starts_with("0\n"), "Should start with 0");
+        assert!(output.contains("TTTT"), "Should contain TTTT");
+    }
+
+    #[test]
+    fn large_numbers() {
+        let result = compile_and_run(
+            r#"
+            function main() {
+                var big = 10000;
+                print(big);
+                assert(big > 9999);
+                assert(big < 10001);
+            }
+        "#,
+        )
+        .expect("Compile and run failed");
+        let output = String::from_utf8(result.stdout).unwrap();
+        assert!(output.contains("10000"), "Should contain 10000");
+        assert!(output.contains("TT"), "Should contain TT");
+    }
+
+    #[test]
+    fn function_with_no_params() {
+        let result = compile_and_run(
+            r#"
+            function get_constant() {
+                return 42;
+            }
+
+            function main() {
+                print(get_constant());
+                assert(get_constant() == 42);
+            }
+        "#,
+        )
+        .expect("Compile and run failed");
+        let output = String::from_utf8(result.stdout).unwrap();
+        assert_eq!("42\nT", output);
+    }
+
+    #[test]
+    fn complex_expression_evaluation() {
+        let result = compile_and_run(
+            r#"
+            function main() {
+                var result = ((10 + 5) * 2 - 6) / 3;
+                print(result);
+                assert(result == 8);
+            }
+        "#,
+        )
+        .expect("Compile and run failed");
+        let output = String::from_utf8(result.stdout).unwrap();
+        assert_eq!("8\nT", output);
     }
 }

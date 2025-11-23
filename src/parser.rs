@@ -46,6 +46,10 @@ peg::parser! {
                 let mut iter = a.into_iter().take(1);
                 let ast: AST = iter.next().unwrap();
                 AST::ArrayLength(Box::new(ast))
+            }else if callee.to_string() == "print" {
+                let mut iter = a.into_iter().take(1);
+                let ast: AST = iter.next().unwrap();
+                AST::Print(Box::new(ast))
             } else {
               AST::Call {
                 callee: callee.to_string(),
@@ -57,7 +61,7 @@ peg::parser! {
     pub rule atom() -> AST
       = call() / ArrayLiteral() / ArrayLookup() /  True() / False() / Null() / Undefined() / Id() / Number()
 
-    /// alow whitespaces before after
+    /// allow whitespaces before after
     pub rule expression() -> AST = _ e:expressionPrecedence() _ {e }
 
     pub rule expressionPrecedence() -> AST = precedence!{
@@ -1488,5 +1492,738 @@ var x = 1;
             expected_ast,
             lang_parser::statement("var a =  length(b);").expect("Parser failed")
         )
+    }
+
+    // ========== NEW PARSER TESTS ==========
+
+    // ===== Print Statement Tests =====
+
+    #[test]
+    fn print_number() {
+        let expected_ast = AST::Print(AST::Number(42).into());
+        assert_eq!(
+            expected_ast,
+            lang_parser::statement("print(42);").expect("Parser failed")
+        )
+    }
+
+    #[test]
+    fn print_variable() {
+        let expected_ast = AST::Print(AST::Id("x".to_string()).into());
+        assert_eq!(
+            expected_ast,
+            lang_parser::statement("print(x);").expect("Parser failed")
+        )
+    }
+
+    #[test]
+    fn print_expression() {
+        let expected_ast = AST::Print(
+            AST::Add {
+                left: AST::Number(10).into(),
+                right: AST::Number(20).into(),
+            }
+            .into(),
+        );
+        assert_eq!(
+            expected_ast,
+            lang_parser::statement("print(10 + 20);").expect("Parser failed")
+        )
+    }
+
+    #[test]
+    fn print_array_access() {
+        let expected_ast = AST::Print(
+            AST::ArrayLookup {
+                array: AST::Id("arr".to_string()).into(),
+                index: AST::Number(0).into(),
+            }
+            .into(),
+        );
+        assert_eq!(
+            expected_ast,
+            lang_parser::statement("print(arr[0]);").expect("Parser failed")
+        )
+    }
+
+    #[test]
+    fn print_function_call() {
+        let expected_ast = AST::Print(
+            AST::Call {
+                callee: "foo".to_string(),
+                args: vec![AST::Number(5)],
+            }
+            .into(),
+        );
+        assert_eq!(
+            expected_ast,
+            lang_parser::statement("print(foo(5));").expect("Parser failed")
+        )
+    }
+
+    // ===== Complex Expression Tests =====
+
+    #[test]
+    fn deeply_nested_arithmetic() {
+        let expected_ast = AST::Add {
+            left: AST::Multiply {
+                left: AST::Subtract {
+                    left: AST::Number(10).into(),
+                    right: AST::Number(2).into(),
+                }
+                .into(),
+                right: AST::Number(3).into(),
+            }
+            .into(),
+            right: AST::Number(4).into(),
+        };
+        assert_eq!(
+            expected_ast,
+            lang_parser::expression("(10 - 2) * 3 + 4").expect("Parser failed")
+        )
+    }
+
+    #[test]
+    fn parentheses_override_precedence() {
+        let expected_ast = AST::Multiply {
+            left: AST::Number(2).into(),
+            right: AST::Add {
+                left: AST::Number(3).into(),
+                right: AST::Number(4).into(),
+            }
+            .into(),
+        };
+        assert_eq!(
+            expected_ast,
+            lang_parser::expression("2 * (3 + 4)").expect("Parser failed")
+        )
+    }
+
+    #[test]
+    fn division_and_multiplication_precedence() {
+        let expected_ast = AST::Divide {
+            left: AST::Multiply {
+                left: AST::Number(8).into(),
+                right: AST::Number(4).into(),
+            }
+            .into(),
+            right: AST::Number(2).into(),
+        };
+        assert_eq!(
+            expected_ast,
+            lang_parser::expression("8 * 4 / 2").expect("Parser failed")
+        )
+    }
+
+    #[test]
+    fn complex_boolean_expression() {
+        let expected_ast = AST::Equal {
+            left: AST::LessThan {
+                left: AST::Number(5).into(),
+                right: AST::Number(10).into(),
+            }
+            .into(),
+            right: AST::Boolean(true).into(),
+        };
+        assert_eq!(
+            expected_ast,
+            lang_parser::expression("(5 < 10) == true").expect("Parser failed")
+        )
+    }
+
+    #[test]
+    fn not_with_comparison() {
+        let expected_ast = AST::Not(
+            AST::GreaterThan {
+                left: AST::Number(3).into(),
+                right: AST::Number(5).into(),
+            }
+            .into(),
+        );
+        assert_eq!(
+            expected_ast,
+            lang_parser::expression("!(3 > 5)").expect("Parser failed")
+        )
+    }
+
+    #[test]
+    fn chained_comparisons() {
+        let expected_ast = AST::NotEqual {
+            left: AST::GreaterThanEqual {
+                left: AST::Id("x".to_string()).into(),
+                right: AST::Number(10).into(),
+            }
+            .into(),
+            right: AST::Boolean(false).into(),
+        };
+        assert_eq!(
+            expected_ast,
+            lang_parser::expression("(x >= 10) != false").expect("Parser failed")
+        )
+    }
+
+    // ===== Number Parsing Tests =====
+
+    #[test]
+    fn large_number() {
+        let expected_ast = AST::Number(999999);
+        assert_eq!(
+            expected_ast,
+            lang_parser::expression("999999").expect("Parser failed")
+        )
+    }
+
+    #[test]
+    fn zero() {
+        let expected_ast = AST::Number(0);
+        assert_eq!(
+            expected_ast,
+            lang_parser::expression("0").expect("Parser failed")
+        )
+    }
+
+    #[test]
+    fn single_digit() {
+        let expected_ast = AST::Number(7);
+        assert_eq!(
+            expected_ast,
+            lang_parser::expression("7").expect("Parser failed")
+        )
+    }
+
+    // ===== Boolean and Special Values Tests =====
+
+    #[test]
+    fn true_literal() {
+        let expected_ast = AST::Boolean(true);
+        assert_eq!(
+            expected_ast,
+            lang_parser::expression("true").expect("Parser failed")
+        )
+    }
+
+    #[test]
+    fn false_literal() {
+        let expected_ast = AST::Boolean(false);
+        assert_eq!(
+            expected_ast,
+            lang_parser::expression("false").expect("Parser failed")
+        )
+    }
+
+    #[test]
+    fn null_literal() {
+        let expected_ast = AST::Null;
+        assert_eq!(
+            expected_ast,
+            lang_parser::expression("null").expect("Parser failed")
+        )
+    }
+
+    #[test]
+    fn undefined_literal() {
+        let expected_ast = AST::Undefined;
+        assert_eq!(
+            expected_ast,
+            lang_parser::expression("undefined").expect("Parser failed")
+        )
+    }
+
+    #[test]
+    fn boolean_in_arithmetic() {
+        let expected_ast = AST::Add {
+            left: AST::Boolean(true).into(),
+            right: AST::Number(1).into(),
+        };
+        assert_eq!(
+            expected_ast,
+            lang_parser::expression("true + 1").expect("Parser failed")
+        )
+    }
+
+    // ===== Variable and Assignment Tests =====
+
+    #[test]
+    fn var_with_complex_expression() {
+        let expected_ast = AST::Var {
+            name: "result".to_string(),
+            value: AST::Multiply {
+                left: AST::Add {
+                    left: AST::Number(5).into(),
+                    right: AST::Number(3).into(),
+                }
+                .into(),
+                right: AST::Number(2).into(),
+            }
+            .into(),
+        };
+        assert_eq!(
+            expected_ast,
+            lang_parser::statement("var result = (5 + 3) * 2;").expect("Parser failed")
+        )
+    }
+
+    #[test]
+    fn assign_array_element() {
+        let expected_ast = AST::Assign {
+            name: "x".to_string(),
+            value: AST::ArrayLookup {
+                array: AST::Id("arr".to_string()).into(),
+                index: AST::Number(5).into(),
+            }
+            .into(),
+        };
+        assert_eq!(
+            expected_ast,
+            lang_parser::statement("x = arr[5];").expect("Parser failed")
+        )
+    }
+
+    #[test]
+    fn var_with_function_call() {
+        let expected_ast = AST::Var {
+            name: "len".to_string(),
+            value: AST::ArrayLength(AST::Id("myArray".to_string()).into()).into(),
+        };
+        assert_eq!(
+            expected_ast,
+            lang_parser::statement("var len = length(myArray);").expect("Parser failed")
+        )
+    }
+
+    // ===== Array Tests =====
+
+    #[test]
+    fn empty_array_literal() {
+        let expected_ast = AST::ArrayLiteral(vec![]);
+        assert_eq!(
+            expected_ast,
+            lang_parser::expression("[]").expect("Parser failed")
+        )
+    }
+
+    #[test]
+    fn array_with_mixed_types() {
+        let expected_ast = AST::ArrayLiteral(vec![
+            AST::Number(1),
+            AST::Boolean(true),
+            AST::Id("x".to_string()),
+            AST::Null,
+        ]);
+        assert_eq!(
+            expected_ast,
+            lang_parser::expression("[1, true, x, null]").expect("Parser failed")
+        )
+    }
+
+    #[test]
+    fn array_with_expressions() {
+        let expected_ast = AST::ArrayLiteral(vec![
+            AST::Add {
+                left: AST::Number(1).into(),
+                right: AST::Number(2).into(),
+            },
+            AST::Multiply {
+                left: AST::Number(3).into(),
+                right: AST::Number(4).into(),
+            },
+        ]);
+        assert_eq!(
+            expected_ast,
+            lang_parser::expression("[1 + 2, 3 * 4]").expect("Parser failed")
+        )
+    }
+
+    #[test]
+    fn nested_array_access() {
+        let expected_ast = AST::ArrayLookup {
+            array: AST::Id("matrix".to_string()).into(),
+            index: AST::Add {
+                left: AST::Id("i".to_string()).into(),
+                right: AST::Number(1).into(),
+            }
+            .into(),
+        };
+        assert_eq!(
+            expected_ast,
+            lang_parser::expression("matrix[i + 1]").expect("Parser failed")
+        )
+    }
+
+    // ===== Function Tests =====
+
+    #[test]
+    fn function_with_single_param() {
+        let expected_ast = AST::Function {
+            name: "double".to_string(),
+            parameters: vec!["n".to_string()],
+            body: AST::Block(vec![AST::Return {
+                term: AST::Multiply {
+                    left: AST::Id("n".to_string()).into(),
+                    right: AST::Number(2).into(),
+                }
+                .into(),
+            }])
+            .into(),
+        };
+        assert_eq!(
+            expected_ast,
+            lang_parser::statement("function double(n) { return n * 2; }")
+                .expect("Parser failed")
+        )
+    }
+
+    #[test]
+    fn function_with_four_params() {
+        let expected_ast = AST::Function {
+            name: "sum4".to_string(),
+            parameters: vec![
+                "a".to_string(),
+                "b".to_string(),
+                "c".to_string(),
+                "d".to_string(),
+            ],
+            body: AST::Block(vec![AST::Return {
+                term: AST::Add {
+                    left: AST::Add {
+                        left: AST::Add {
+                            left: AST::Id("a".to_string()).into(),
+                            right: AST::Id("b".to_string()).into(),
+                        }
+                        .into(),
+                        right: AST::Id("c".to_string()).into(),
+                    }
+                    .into(),
+                    right: AST::Id("d".to_string()).into(),
+                }
+                .into(),
+            }])
+            .into(),
+        };
+        assert_eq!(
+            expected_ast,
+            lang_parser::statement("function sum4(a, b, c, d) { return a + b + c + d; }")
+                .expect("Parser failed")
+        )
+    }
+
+    #[test]
+    fn function_with_no_params() {
+        let expected_ast = AST::Function {
+            name: "getConstant".to_string(),
+            parameters: vec![],
+            body: AST::Block(vec![AST::Return {
+                term: AST::Number(42).into(),
+            }])
+            .into(),
+        };
+        assert_eq!(
+            expected_ast,
+            lang_parser::statement("function getConstant() { return 42; }").expect("Parser failed")
+        )
+    }
+
+    #[test]
+    fn function_call_with_multiple_args() {
+        let expected_ast = AST::Call {
+            callee: "calculate".to_string(),
+            args: vec![
+                AST::Number(1),
+                AST::Number(2),
+                AST::Id("x".to_string()),
+                AST::Add {
+                    left: AST::Id("y".to_string()).into(),
+                    right: AST::Number(5).into(),
+                },
+            ],
+        };
+        assert_eq!(
+            expected_ast,
+            lang_parser::expression("calculate(1, 2, x, y + 5)").expect("Parser failed")
+        )
+    }
+
+    #[test]
+    fn nested_function_calls() {
+        let expected_ast = AST::Call {
+            callee: "outer".to_string(),
+            args: vec![AST::Call {
+                callee: "inner".to_string(),
+                args: vec![AST::Number(5)],
+            }],
+        };
+        assert_eq!(
+            expected_ast,
+            lang_parser::expression("outer(inner(5))").expect("Parser failed")
+        )
+    }
+
+    // ===== Control Flow Tests =====
+
+    #[test]
+    fn if_with_empty_else() {
+        let expected_ast = AST::IfNode {
+            conditional: AST::Id("x".to_string()).into(),
+            consequence: AST::Block(vec![AST::Assign {
+                name: "y".to_string(),
+                value: AST::Number(1).into(),
+            }])
+            .into(),
+            alternative: AST::Block(vec![]).into(),
+        };
+        assert_eq!(
+            expected_ast,
+            lang_parser::statement("if (x) { y = 1; } else { }").expect("Parser failed")
+        )
+    }
+
+    #[test]
+    fn while_with_multiple_statements() {
+        let expected_ast = AST::While {
+            conditional: AST::LessThan {
+                left: AST::Id("i".to_string()).into(),
+                right: AST::Number(10).into(),
+            }
+            .into(),
+            body: AST::Block(vec![
+                AST::Assign {
+                    name: "sum".to_string(),
+                    value: AST::Add {
+                        left: AST::Id("sum".to_string()).into(),
+                        right: AST::Id("i".to_string()).into(),
+                    }
+                    .into(),
+                },
+                AST::Assign {
+                    name: "i".to_string(),
+                    value: AST::Add {
+                        left: AST::Id("i".to_string()).into(),
+                        right: AST::Number(1).into(),
+                    }
+                    .into(),
+                },
+            ])
+            .into(),
+        };
+        assert_eq!(
+            expected_ast,
+            lang_parser::statement("while (i < 10) { sum = sum + i; i = i + 1; }")
+                .expect("Parser failed")
+        )
+    }
+
+    #[test]
+    fn return_with_complex_expression() {
+        let expected_ast = AST::Return {
+            term: AST::Multiply {
+                left: AST::Call {
+                    callee: "factorial".to_string(),
+                    args: vec![AST::Subtract {
+                        left: AST::Id("n".to_string()).into(),
+                        right: AST::Number(1).into(),
+                    }],
+                }
+                .into(),
+                right: AST::Id("n".to_string()).into(),
+            }
+            .into(),
+        };
+        assert_eq!(
+            expected_ast,
+            lang_parser::statement("return factorial(n - 1) * n;").expect("Parser failed")
+        )
+    }
+
+    // ===== Block and Main Tests =====
+
+    #[test]
+    fn block_with_mixed_statements() {
+        let expected_ast = AST::Block(vec![
+            AST::Var {
+                name: "x".to_string(),
+                value: AST::Number(5).into(),
+            },
+            AST::Print(AST::Id("x".to_string()).into()),
+            AST::Assign {
+                name: "x".to_string(),
+                value: AST::Number(10).into(),
+            },
+            AST::Assert(AST::Equal {
+                left: AST::Id("x".to_string()).into(),
+                right: AST::Number(10).into(),
+            }.into()),
+        ]);
+        assert_eq!(
+            expected_ast,
+            lang_parser::statement("{ var x = 5; print(x); x = 10; assert(x == 10); }")
+                .expect("Parser failed")
+        )
+    }
+
+    #[test]
+    fn main_with_all_statement_types() {
+        let result = lang_parser::parser(
+            r#"
+            function main() {
+                var x = 10;
+                x = x + 1;
+                if (x > 5) {
+                    print(x);
+                } else {
+                    print(0);
+                }
+                while (x > 0) {
+                    x = x - 1;
+                }
+                assert(x == 0);
+                return 0;
+            }
+            "#,
+        );
+        assert!(result.is_ok(), "Parser should successfully parse main function with all statement types");
+        if let Ok(AST::Main(statements)) = result {
+            assert_eq!(statements.len(), 1, "Should have one function");
+        }
+    }
+
+    // ===== Whitespace and Formatting Tests =====
+
+    #[test]
+    fn expression_with_no_spaces() {
+        let expected_ast = AST::Add {
+            left: AST::Multiply {
+                left: AST::Number(2).into(),
+                right: AST::Number(3).into(),
+            }
+            .into(),
+            right: AST::Number(4).into(),
+        };
+        assert_eq!(
+            expected_ast,
+            lang_parser::expression("2*3+4").expect("Parser failed")
+        )
+    }
+
+    #[test]
+    fn expression_with_excessive_spaces() {
+        let expected_ast = AST::Add {
+            left: AST::Number(1).into(),
+            right: AST::Number(2).into(),
+        };
+        assert_eq!(
+            expected_ast,
+            lang_parser::expression("  1   +   2  ").expect("Parser failed")
+        )
+    }
+
+    #[test]
+    fn statement_with_newlines() {
+        let expected_ast = AST::Var {
+            name: "x".to_string(),
+            value: AST::Number(42).into(),
+        };
+        assert_eq!(
+            expected_ast,
+            lang_parser::statement("var x\n=\n42;").expect("Parser failed")
+        )
+    }
+
+    #[test]
+    fn function_with_multiline_body() {
+        let result = lang_parser::statement(
+            "function test() {\n  var x = 1;\n  return x;\n}",
+        );
+        assert!(result.is_ok(), "Parser should handle multiline function bodies");
+    }
+
+    // ===== Edge Cases and Complex Scenarios =====
+
+    #[test]
+    fn deeply_nested_blocks() {
+        let result = lang_parser::statement(
+            "{ { { var x = 1; } } }",
+        );
+        assert!(result.is_ok(), "Parser should handle deeply nested blocks");
+    }
+
+    #[test]
+    fn long_identifier_name() {
+        let expected_ast = AST::Id("thisIsAVeryLongVariableNameForTesting".to_string());
+        assert_eq!(
+            expected_ast,
+            lang_parser::expression("thisIsAVeryLongVariableNameForTesting")
+                .expect("Parser failed")
+        )
+    }
+
+    #[test]
+    fn identifier_with_numbers() {
+        let expected_ast = AST::Id("var123test".to_string());
+        assert_eq!(
+            expected_ast,
+            lang_parser::expression("var123test").expect("Parser failed")
+        )
+    }
+
+    #[test]
+    fn identifier_with_underscores() {
+        let expected_ast = AST::Id("my_var_name".to_string());
+        assert_eq!(
+            expected_ast,
+            lang_parser::expression("my_var_name").expect("Parser failed")
+        )
+    }
+
+    #[test]
+    fn comparison_all_operators() {
+        // Test all comparison operators parse correctly
+        assert!(lang_parser::expression("a == b").is_ok());
+        assert!(lang_parser::expression("a != b").is_ok());
+        assert!(lang_parser::expression("a < b").is_ok());
+        assert!(lang_parser::expression("a > b").is_ok());
+        assert!(lang_parser::expression("a <= b").is_ok());
+        assert!(lang_parser::expression("a >= b").is_ok());
+    }
+
+    #[test]
+    fn all_arithmetic_operators() {
+        // Test all arithmetic operators parse correctly
+        assert!(lang_parser::expression("a + b").is_ok());
+        assert!(lang_parser::expression("a - b").is_ok());
+        assert!(lang_parser::expression("a * b").is_ok());
+        assert!(lang_parser::expression("a / b").is_ok());
+    }
+
+    #[test]
+    fn assert_with_complex_condition() {
+        let expected_ast = AST::Assert(
+            AST::Equal {
+                left: AST::Call {
+                    callee: "factorial".to_string(),
+                    args: vec![AST::Number(5)],
+                }
+                .into(),
+                right: AST::Number(120).into(),
+            }
+            .into(),
+        );
+        assert_eq!(
+            expected_ast,
+            lang_parser::statement("assert(factorial(5) == 120);").expect("Parser failed")
+        )
+    }
+
+    #[test]
+    fn multiple_functions_in_program() {
+        let result = lang_parser::parser(
+            r#"
+            function helper(x) { return x * 2; }
+            function main() { return helper(5); }
+            "#,
+        );
+        assert!(result.is_ok(), "Parser should handle multiple functions");
+        if let Ok(AST::Main(statements)) = result {
+            assert_eq!(statements.len(), 2, "Should have two functions");
+        }
     }
 }

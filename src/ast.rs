@@ -95,6 +95,7 @@ pub enum AST {
 
     Main(Vec<AST>),
     Assert(Box<AST>),
+    Print(Box<AST>),
 }
 
 impl From<u8> for Box<AST> {
@@ -171,6 +172,9 @@ impl fmt::Display for AST {
             }
             AST::Assert(condition) => {
                 write!(f, "assert({})", condition)
+            }
+            AST::Print(condition) => {
+                write!(f, "print({})", condition)
             }
             AST::Undefined => {
                 write!(f, "undefined")
